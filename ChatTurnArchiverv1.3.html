@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>Chat Turn Archiver (Archive only after 3 pastes)</title>
+<style>
+  :root { --gap: 0.5rem; }
+  body { font-family: Georgia, BBHSansBartle-Regular, system-ui, sans-serif; background-color: #000000; color: #FFFFFF; margin: 1rem; background: #fafafa; }
+  h2 { margin: 0 0 0.75rem; }
+  .row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--gap); margin-bottom: var(--gap);
+  }
+  @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
+
+  textarea, input[type="text"] {
+    width: 100%; box-sizing: border-box; padding: 0.6rem;
+    font: 14px/1.3 system-ui, sans-serif; white-space: pre-wrap;
+  }
+  textarea { height: 8rem; }
+  textarea::placeholder, input::placeholder { color: #777; }
+
+  .controls, .import-controls, .history-controls {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap);
+    margin: 0.5rem 0 0.5rem;
+  }
+  button {
+    padding: 0.5rem 0.8rem; border-radius: 6px; border: 1px solid #bbb; background: #fff; cursor: pointer;
+  }
+  button:hover { background: #f1f1f1; }
+  .hint { color: #666; font-size: 0.9em; }
+
+  .table-wrap {
+    height: 60vh; overflow: auto; border: 1px solid #ddd; background: #000; border-radius: 6px;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { position: sticky; top: 0; background: #f5f5f5; z-index: 1; }
+  th, td { border-bottom: 1px solid #eee; vertical-align: top; padding: 0.5rem; }
+  .ts { color: #666; font-size: 0.85em; white-space: nowrap; }
+
+  .cell-editor {
+    width: 100%; min-height: 6rem; box-sizing: border-box; padding: 0.4rem;
+    font: 14px/1.3 system-ui, sans-serif; white-space: pre-wrap;
+  }
+
+  .search-box { width: 100%; padding: 0.5rem; margin: 0.4rem 0; box-sizing: border-box; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+    background: #222; color: #fff; padding: 8px 12px; border-radius: 8px;
+    opacity: 0; transition: opacity 180ms ease-in-out; pointer-events: none;
+    font-size: 0.9em;
+  }
+  .toast.show { opacity: 0.92; }
+
+  .import-panel { display: none; gap: var(--gap); margin: 0.5rem 0; }
+  .import-panel.show { display: grid; grid-template-columns: 1fr auto; align-items: start; }
+  .import-panel textarea { height: 10rem; }
+</style>
+</head>
+<body>
+  <h2>📋 Chat Turn Archiver</h2>
+
+  <div class="row">
+    <textarea id="taPrompt" placeholder="Paste PROMPT here…" spellcheck="false"></textarea>
+    <textarea id="taThinking" placeholder="Paste THINKING here…" spellcheck="false"></textarea>
+    <textarea id="taResponse" placeholder="Paste RESPONSE here…" spellcheck="false"></textarea>
+  </div>
+
+  <div class="controls">
+    <button id="exportBtn"  title="Open JSON in a new window">Export JSON</button>
+    <button id="downloadBtn" title="Download JSON file">Download JSON</button>
+    <button id="importToggleBtn" title="Show/hide import panel">Import JSON</button>
+    <input type="file" id="fileInput" accept="application/json" style="display:none" />
+    <button id="clearBtn"  title="Clear all captured data (with confirmation)">Clear All</button>
+    <span class="hint">This version archives a turn only after detecting a paste in all 3 boxes (and all 3 contain text).</span>
+  </div>
+
+  <div class="import-panel" id="importPanel">
+    <textarea id="importTextarea" placeholder="Paste repository JSON here…"></textarea>
+    <div style="display:flex; flex-direction:column; gap:0.5rem;">
+      <button id="importFromTextBtn">Import From Text</button>
+      <button id="importFromFileBtn">Import From File…</button>
+      <button id="importReplaceBtn" title="Replace instead of merging">Replace Mode: OFF</button>
+    </div>
+  </div>
+
+  <input id="search" class="search-box" placeholder="Search prompt / thinking / response…" />
+
+  <div class="history-controls">
+    <button id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
+    <button id="redoBtn" title="Redo (Ctrl+Y)">Redo</button>
+  </div>
+
+  <div class="table-wrap" id="tableWrap" aria-label="Captured conversational turns">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 13rem;">Time</th>
+          <th>Prompt</th>
+          <th>Thinking</th>
+          <th>Response</th>
+        </tr>
+      </thead>
+      <tbody id="repoTbody"></tbody>
+    </table>
+  </div>
+
+  <div class="toast" id="toast">Turn saved</div>
+
+<script>
+  // ===== DOM =====
+  const taPrompt   = document.getElementById('taPrompt');
+  const taThinking = document.getElementById('taThinking');
+  const taResponse = document.getElementById('taResponse');
+
+  const exportBtn  = document.getElementById('exportBtn');
+  const downloadBtn= document.getElementById('downloadBtn');
+  const clearBtn   = document.getElementById('clearBtn');
+
+  const importToggleBtn   = document.getElementById('importToggleBtn');
+  const importPanel       = document.getElementById('importPanel');
+  const importTextarea    = document.getElementById('importTextarea');
+  const importFromTextBtn = document.getElementById('importFromTextBtn');
+  const importFromFileBtn = document.getElementById('importFromFileBtn');
+  const importReplaceBtn  = document.getElementById('importReplaceBtn');
+  const fileInput         = document.getElementById('fileInput');
+
+  const undoBtn    = document.getElementById('undoBtn');
+  const redoBtn    = document.getElementById('redoBtn');
+
+  const searchEl   = document.getElementById('search');
+  const repoTbody  = document.getElementById('repoTbody');
+  const toastEl    = document.getElementById('toast');
+
+  // ===== Storage Keys =====
+  const STORAGE_KEY = 'chatTurnRepo.v2.paste-triple';
+  const SNAP_KEY    = 'chatTurnRepo.snapshot.v1';
+
+  // ===== Repo & History =====
+  // item: { id, t, prompt, thinking, response }
+  const repo = { version: 2, created: Date.now(), items: [] };
+
+  const UNDO_LIMIT = 50;
+  const history = [];
+  let historyIdx = -1;
+
+  function pushHistory() {
+    try {
+      history.splice(historyIdx + 1);
+      history.push(JSON.stringify(repo));
+      if (history.length > UNDO_LIMIT) history.shift();
+      historyIdx = history.length - 1;
+    } catch {}
+  }
+  function undo() {
+    if (historyIdx > 0) {
+      historyIdx--;
+      const parsed = JSON.parse(history[historyIdx]);
+      recreateFromParsed(parsed, {pushHist:false, replace:true});
+      saveRepoDebounced();
+    }
+  }
+  function redo() {
+    if (historyIdx < history.length - 1) {
+      historyIdx++;
+      const parsed = JSON.parse(history[historyIdx]);
+      recreateFromParsed(parsed, {pushHist:false, replace:true});
+      saveRepoDebounced();
+    }
+  }
+
+  // ===== Debounced Autosave + Snapshots =====
+  let saveTimer = null;
+  function saveRepo() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(repo)); } catch (e) { console.warn('saveRepo failed:', e); }
+  }
+  function saveRepoDebounced() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveRepo, 200);
+  }
+  function snapshotRepo() {
+    try { localStorage.setItem(SNAP_KEY, JSON.stringify(repo)); } catch {}
+  }
+  let sinceLastSnap = 0;
+  function afterInsert() {
+    saveRepoDebounced();
+    sinceLastSnap += 1;
+    if (sinceLastSnap >= 25) { snapshotRepo(); sinceLastSnap = 0; }
+  }
+
+  // ===== IDs, helpers =====
+  function makeId() {
+    return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  }
+  function showToast(msg='Turn saved', ms=500) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    setTimeout(() => toastEl.classList.remove('show'), ms);
+  }
+
+  // ===== Insert turn =====
+  function insertTurn(p, th, r) {
+    repo.items.push({
+      id: makeId(),
+      t: Date.now(),
+      prompt: (p || ''),
+      thinking: (th || ''),
+      response: (r || '')
+    });
+    pushHistory();
+    renderTable();
+    afterInsert();
+    showToast('Turn saved', 500);
+  }
+
+  // ===== Restore / Recreate =====
+  function restoreRepo() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      recreateFromParsed(parsed, {replace:true});
+    } catch (e) { console.warn('restoreRepo failed:', e); }
+  }
+
+  function normalizeItem(x) {
+    return {
+      id: (x.id || makeId()),
+      t: (typeof x.t === 'number' ? x.t : Date.now()),
+      prompt: (x.prompt ?? '').toString(),
+      thinking: (x.thinking ?? '').toString(),
+      response: (x.response ?? '').toString()
+    };
+  }
+
+  // opts: {pushHist?:boolean, replace?:boolean}
+  function recreateFromParsed(parsed, opts={pushHist:true, replace:true}) {
+    if (!parsed || typeof parsed !== 'object') return;
+    let items = [];
+    if (Array.isArray(parsed.items)) items = parsed.items.map(normalizeItem);
+    else if (Array.isArray(parsed)) items = parsed.map(normalizeItem);
+
+    repo.version = 2;
+    repo.created = parsed.created || Date.now();
+
+    if (opts.replace) repo.items = items;
+    else repo.items = repo.items.concat(items);
+
+    if (opts.pushHist) pushHistory();
+    renderTable();
+    saveRepoDebounced();
+  }
+
+  // ===== Paste gating logic =====
+  // We archive only when:
+  // (1) all three textareas have fired a 'paste' since last reset, and
+  // (2) all three contain non-empty text (trimmed)
+  const pasted = { prompt: false, thinking: false, response: false };
+
+  function resetPasteFlags() {
+    pasted.prompt = false; pasted.thinking = false; pasted.response = false;
+  }
+  function allPasted() {
+    return pasted.prompt && pasted.thinking && pasted.response;
+  }
+  function allHaveText() {
+    return taPrompt.value.trim() && taThinking.value.trim() && taResponse.value.trim();
+  }
+  function tryArchiveAfterPastes() {
+    if (allPasted() && allHaveText()) {
+      insertTurn(taPrompt.value, taThinking.value, taResponse.value);
+      // clear UI and flags
+      taPrompt.value = ''; taThinking.value = ''; taResponse.value = '';
+      resetPasteFlags();
+      taPrompt.focus();
+    }
+  }
+
+  function attachPasteOnly(el, which) {
+    el.addEventListener('paste', () => {
+      // let the paste render; then mark and check
+      setTimeout(() => {
+        pasted[which] = true;
+        tryArchiveAfterPastes();
+      }, 0);
+    });
+  }
+  attachPasteOnly(taPrompt,   'prompt');
+  attachPasteOnly(taThinking, 'thinking');
+  attachPasteOnly(taResponse, 'response');
+
+  // ===== Export / Download / Clear =====
+  function deflateToJSONString(space = 2) {
+    return JSON.stringify({ version: repo.version, created: repo.created, items: repo.items }, null, space);
+  }
+
+  exportBtn.addEventListener('click', () => {
+    const w = window.open('', '_blank', 'noopener,noreferrer');
+    const s = deflateToJSONString(2);
+    if (w) {
+      w.document.write('<pre style="white-space:pre-wrap;margin:16px;">'
+        + s.replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch] || ch))
+        + '</pre>');
+      w.document.close();
+    } else {
+      window.prompt('Copy JSON:', s);
+    }
+  });
+
+  downloadBtn.addEventListener('click', () => {
+    const blob = new Blob([deflateToJSONString(2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'chat_turns.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(a.href);
+  });
+
+  clearBtn.addEventListener('click', () => {
+    const ok = confirm('Clear all captured turns? This cannot be undone.');
+    if (!ok) return;
+    repo.items = [];
+    pushHistory();
+    renderTable();
+    saveRepoDebounced();
+  });
+
+  // ===== Import (file + pasted JSON) =====
+  let importReplaceMode = false; // default: merge
+  importToggleBtn.addEventListener('click', () => {
+    importPanel.classList.toggle('show');
+    if (importPanel.classList.contains('show')) importTextarea.focus();
+  });
+  importReplaceBtn.addEventListener('click', () => {
+    importReplaceMode = !importReplaceMode;
+    importReplaceBtn.textContent = 'Replace Mode: ' + (importReplaceMode ? 'ON' : 'OFF');
+  });
+  importFromTextBtn.addEventListener('click', () => {
+    const txt = importTextarea.value;
+    if (!txt.trim()) return;
+    try {
+      const parsed = JSON.parse(txt);
+      recreateFromParsed(parsed, {replace: importReplaceMode, pushHist:true});
+      showToast(importReplaceMode ? 'Imported (replaced)' : 'Imported (merged)', 700);
+    } catch (e) {
+      alert('Invalid JSON.');
+    }
+  });
+  importFromFileBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (!f) return;
+    try {
+      const txt = await f.text();
+      const parsed = JSON.parse(txt);
+      recreateFromParsed(parsed, {replace: importReplaceMode, pushHist:true});
+      showToast(importReplaceMode ? 'File imported (replaced)' : 'File imported (merged)', 700);
+    } catch {
+      alert('Could not read or parse the file as JSON.');
+    } finally {
+      fileInput.value = '';
+    }
+  });
+
+  // ===== Undo / Redo + Keyboard =====
+  undoBtn.addEventListener('click', undo);
+  redoBtn.addEventListener('click', redo);
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+    if (e.ctrlKey && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+  });
+
+  // ===== Search =====
+  searchEl.addEventListener('input', renderTable);
+  function getFilteredItems() {
+    const q = (searchEl.value || '').toLowerCase();
+    if (!q) return repo.items;
+    return repo.items.filter(x =>
+      (x.prompt   || '').toLowerCase().includes(q) ||
+      (x.thinking || '').toLowerCase().includes(q) ||
+      (x.response || '').toLowerCase().includes(q)
+    );
+  }
+
+  // ===== Inline Edit (click-to-edit cells) =====
+  let editing = null; // {td, id, field, original}
+  repoTbody.addEventListener('click', (e) => {
+    const td = e.target.closest('td[data-field]');
+    if (!td || editing) return;
+    const id = td.parentElement.getAttribute('data-id');
+    const field = td.getAttribute('data-field'); // prompt|thinking|response
+    const item = repo.items.find(x => x.id === id);
+    if (!item) return;
+
+    const original = item[field] || '';
+    const editor = document.createElement('textarea');
+    editor.className = 'cell-editor';
+    editor.value = original;
+    td.textContent = '';
+    td.appendChild(editor);
+    editing = { td, id, field, original };
+    editor.focus();
+    editor.setSelectionRange(editor.value.length, editor.value.length);
+
+    function finish(save) {
+      if (!editing) return;
+      const { td, id, field, original } = editing;
+      const val = editor.value;
+      td.removeEventListener('keydown', onKey);
+      editor.removeEventListener('blur', onBlur);
+      td.removeChild(editor);
+      if (save) {
+        const it = repo.items.find(x => x.id === id);
+        if (it) {
+          it[field] = val;
+          td.textContent = val;
+          pushHistory();
+          saveRepoDebounced();
+          showToast('Edited', 500);
+        }
+      } else {
+        td.textContent = original;
+      }
+      editing = null;
+    }
+    function onBlur(){ finish(true); }
+    function onKey(ev){
+      if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); finish(true); }
+      if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+    }
+    td.addEventListener('keydown', onKey);
+    editor.addEventListener('blur', onBlur);
+  });
+
+  // ===== Render (native) =====
+  function renderTable() {
+    const items = getFilteredItems();
+    repoTbody.innerHTML = '';
+    for (const it of items) {
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-id', it.id);
+
+      const tdTime = document.createElement('td');
+      tdTime.className = 'ts';
+      tdTime.textContent = new Date(it.t || Date.now()).toLocaleString();
+
+      const tdP = document.createElement('td'); tdP.setAttribute('data-field','prompt');   tdP.textContent = it.prompt || '';
+      const tdT = document.createElement('td'); tdT.setAttribute('data-field','thinking'); tdT.textContent = it.thinking || '';
+      const tdR = document.createElement('td'); tdR.setAttribute('data-field','response'); tdR.textContent = it.response || '';
+
+      tr.appendChild(tdTime); tr.appendChild(tdP); tr.appendChild(tdT); tr.appendChild(tdR);
+      repoTbody.appendChild(tr);
+    }
+  }
+
+  // ===== Boot =====
+  window.addEventListener('beforeunload', saveRepo);
+  restoreRepo();     // hydrate from last session
+  renderTable();     // initial render
+  taPrompt.focus();
+</script>
+</body>
+</html>
