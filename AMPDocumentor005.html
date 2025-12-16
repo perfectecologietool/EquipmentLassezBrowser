@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+    <title>Dynamic Accordion Document System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for a smoother experience */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* A light gray background */
+        }
+        .accordion-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.15s ease-in-out;
+        }
+        /* The 'open' state's max-height is now controlled by JavaScript */
+        .accordion-header .arrow {
+            transition: transform 0.1s ease-in-out; /* Adjusted as per your change */
+        }
+        .accordion-section.open .accordion-header .arrow {
+            transform: rotate(90deg);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 p-4 sm:p-6 md:p-8">
+
+    <div id="app-container" class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-lg">
+        <h1 class="text-2xl sm:text-3xl font-bold mb-2 text-gray-900">Dynamic Document System</h1>
+        <p class="text-gray-600 mb-6">Create, edit, and manage nested documents with this accordion-based system.</p>
+
+        <!-- Main Controls -->
+        <div id="main-controls" class="flex flex-wrap gap-3 mb-6 pb-6 border-b border-gray-200">
+            <button id="add-main-section-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                Add New Section
+            </button>
+            <button id="remove-main-section-btn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                Remove Last Section
+            </button>
+        </div>
+
+        <!-- Main Accordion Container -->
+        <div id="main-accordion-container"></div>
+
+        <!-- JSON Import/Export -->
+        <div class="mt-8 pt-6 border-t border-gray-200">
+            <h2 class="text-xl font-bold mb-4 text-gray-900">Import / Export Data</h2>
+            <p class="text-gray-600 mb-4">You can export the entire document structure to JSON, save it, and import it back later.</p>
+            <textarea id="json-io-area" class="w-full h-48 p-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="Paste JSON data here to import..."></textarea>
+            <div class="flex flex-wrap gap-3 mt-4">
+                <button id="export-json-btn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                    Export to JSON
+                </button>
+                <button id="import-json-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                    Import from JSON
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- DATA MODEL & STATE ---
+        let documentData = []; // This array holds the entire nested structure
+
+        // --- CORE RENDERING LOGIC ---
+
+        /**
+         * Traverses up from a starting element and resizes all open parent accordions.
+         * It uses a setTimeout to prevent race conditions with the browser's rendering.
+         * @param {HTMLElement} startElement - The element to start the upward traversal from.
+         */
+        function updateParentAccordions(startElement) {
+            setTimeout(() => {
+                let parentSection = startElement.closest('.accordion-section.open');
+                while (parentSection) {
+                    const parentBody = parentSection.querySelector(':scope > .accordion-body');
+                    if (parentBody) {
+                        parentBody.style.maxHeight = parentBody.scrollHeight + 'px';
+                    }
+                    parentSection = parentSection.parentElement.closest('.accordion-section.open');
+                }
+            }, 300); 
+        }
+
+        /**
+         * Creates and returns a complete accordion section element.
+         * @param {object} sectionData - The data for the section to create.
+         * @param {Array} parentArray - The array this section belongs to (for deletion).
+         */
+        function createAccordionSection(sectionData, parentArray) {
+            const sectionId = `section-${sectionData.id}`;
+            const sectionEl = document.createElement('div');
+            sectionEl.id = sectionId;
+            sectionEl.className = 'accordion-section border border-gray-200 rounded-lg mb-2 bg-white shadow-sm';
+
+            // --- Header ---
+            const headerEl = document.createElement('div');
+            headerEl.className = 'accordion-header flex justify-between items-center p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 rounded-t-lg';
+            
+            const headerTitleContainer = document.createElement('div');
+            headerTitleContainer.className = 'flex items-center gap-3';
+            
+            const arrowEl = document.createElement('span');
+            arrowEl.className = 'arrow text-blue-500 font-bold transform transition-transform';
+            arrowEl.innerHTML = '&#9654;'; // Right-pointing triangle
+
+            const headerTitle = document.createElement('div');
+            headerTitle.className = 'font-semibold text-lg text-gray-800';
+            headerTitle.textContent = sectionData.title;
+
+            headerTitleContainer.append(arrowEl, headerTitle);
+            headerEl.appendChild(headerTitleContainer);
+            
+            headerEl.onclick = (e) => {
+                e.stopPropagation(); 
+
+                const body = sectionEl.querySelector(':scope > .accordion-body');
+                const isOpen = sectionEl.classList.contains('open');
+                
+                if (isOpen) {
+                    body.style.maxHeight = null; 
+                } else {
+                    body.style.maxHeight = body.scrollHeight + 'px';
+                }
+                sectionEl.classList.toggle('open');
+
+                updateParentAccordions(sectionEl);
+            };
+
+            // --- Body ---
+            const bodyEl = document.createElement('div');
+            bodyEl.className = 'accordion-body p-5 border-t border-gray-200';
+
+            // 1. Title display
+            const titleDisplay = document.createElement('div');
+            titleDisplay.className = 'mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md';
+            titleDisplay.innerHTML = `Header Title: <strong class="text-blue-800">${sectionData.title}</strong>`;
+
+            // 2. Input to change header title
+            const titleInputLabel = document.createElement('label');
+            titleInputLabel.className = 'block text-sm font-medium text-gray-700 mb-1';
+            titleInputLabel.textContent = 'Edit Section Title:';
+            const titleInput = document.createElement('input');
+            titleInput.type = 'text';
+            titleInput.value = sectionData.title;
+            titleInput.className = 'w-full p-2 border border-gray-300 rounded-md mb-4 focus:ring-2 focus:ring-blue-500';
+            titleInput.oninput = (e) => {
+                const newTitle = e.target.value;
+                sectionData.title = newTitle;
+                headerTitle.textContent = newTitle;
+                titleDisplay.innerHTML = `Header Title: <strong class="text-blue-800">${newTitle}</strong>`;
+            };
+
+            // 4. Input for section body content
+            const contentInputLabel = document.createElement('label');
+            contentInputLabel.className = 'block text-sm font-medium text-gray-700 mb-1';
+            contentInputLabel.textContent = 'Edit Section Content:';
+            const contentInput = document.createElement('textarea');
+            contentInput.value = sectionData.content;
+            contentInput.className = 'w-full h-32 p-2 border border-gray-300 rounded-md mb-4 focus:ring-2 focus:ring-blue-500';
+            contentInput.placeholder = 'Enter your text content here...';
+            contentInput.oninput = (e) => {
+                sectionData.content = e.target.value;
+                updateParentAccordions(contentInput);
+            };
+
+            // 3. Nested Accordion functionality
+            const nestedAccordionContainer = document.createElement('div');
+            nestedAccordionContainer.className = 'mt-4 pt-4 border-t border-dashed border-gray-300';
+            
+            const addNestedAccordionBtn = document.createElement('button');
+            addNestedAccordionBtn.textContent = 'Add Nested Accordion';
+            addNestedAccordionBtn.className = 'bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-3 rounded-lg text-sm transition-transform transform hover:scale-105';
+            
+            const nestedControlsContainer = document.createElement('div');
+            const nestedAccordionContent = document.createElement('div');
+            
+            addNestedAccordionBtn.onclick = () => {
+                if (!sectionData.children) {
+                    sectionData.children = [];
+                    renderNestedAccordionControls(nestedControlsContainer, nestedAccordionContent, sectionData.children);
+                    addNestedAccordionBtn.style.display = 'none';
+                    updateParentAccordions(addNestedAccordionBtn);
+                }
+            };
+            
+            // **MODIFIED: Add an invisible spacer div to act as a buffer**
+            // This is a clean implementation of your "add an empty section" idea
+            // to fix the height calculation race condition.
+            const spacer = document.createElement('div');
+            spacer.style.height = '1px';
+
+            bodyEl.append(titleDisplay, titleInputLabel, titleInput, contentInputLabel, contentInput, addNestedAccordionBtn, nestedControlsContainer, nestedAccordionContent, spacer);
+            sectionEl.append(headerEl, bodyEl);
+
+            if (sectionData.children) {
+                renderNestedAccordionControls(nestedControlsContainer, nestedAccordionContent, sectionData.children);
+                addNestedAccordionBtn.style.display = 'none';
+                renderAccordion(nestedAccordionContent, sectionData.children);
+            }
+
+            return sectionEl;
+        }
+        
+        function renderNestedAccordionControls(controlsContainer, contentContainer, dataArray) {
+            controlsContainer.innerHTML = ''; 
+            controlsContainer.className = 'flex gap-2 mb-3';
+            
+            const addBtn = document.createElement('button');
+            addBtn.textContent = 'Add Nested Item';
+            addBtn.className = 'bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 px-3 rounded-md text-sm';
+            addBtn.onclick = () => addSection(dataArray, contentContainer);
+
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = 'Remove Last Item';
+            removeBtn.className = 'bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md text-sm';
+            removeBtn.onclick = () => removeLastSection(dataArray, contentContainer);
+            
+            controlsContainer.append(addBtn, removeBtn);
+        }
+
+        function renderAccordion(container, data) {
+            container.innerHTML = '';
+            data.forEach(sectionData => {
+                const sectionEl = createAccordionSection(sectionData, data);
+                container.appendChild(sectionEl);
+            });
+        }
+
+        // --- ACTION HANDLERS ---
+        
+        function addSection(dataArray, container) {
+            const newId = Date.now();
+            const newSectionData = {
+                id: newId,
+                title: `New Section ${newId}`,
+                content: '',
+                children: null
+            };
+            dataArray.push(newSectionData);
+            const sectionEl = createAccordionSection(newSectionData, dataArray);
+            container.appendChild(sectionEl);
+
+            const parentSection = container.closest('.accordion-section');
+            if (parentSection && !parentSection.classList.contains('open')) {
+                parentSection.querySelector(':scope > .accordion-header').click();
+            } else {
+                updateParentAccordions(container);
+            }
+        }
+
+        function removeLastSection(dataArray, container) {
+            if (dataArray.length > 0) {
+                dataArray.pop();
+                if (container.lastChild) {
+                    container.removeChild(container.lastChild);
+                    updateParentAccordions(container);
+                }
+            } else {
+                alert("No sections to remove.");
+            }
+        }
+
+        // --- JSON FUNCTIONALITY ---
+
+        function exportJSON() {
+            const jsonString = JSON.stringify(documentData, null, 2);
+            document.getElementById('json-io-area').value = jsonString;
+            alert('Document structure exported to the text area!');
+        }
+
+        function importJSON() {
+            const jsonString = document.getElementById('json-io-area').value;
+            if (!jsonString.trim()) {
+                alert('Text area is empty. Nothing to import.');
+                return;
+            }
+            try {
+                const newData = JSON.parse(jsonString);
+                if (!Array.isArray(newData)) {
+                    throw new Error("Top-level JSON structure must be an array.");
+                }
+                documentData = newData;
+                renderAccordion(document.getElementById('main-accordion-container'), documentData);
+                alert('Successfully imported data!');
+            } catch (error) {
+                console.error("JSON Import Error:", error);
+                alert(`Import failed. Please check if the JSON is valid.\nError: ${error.message}`);
+            }
+        }
+
+        // --- INITIALIZATION ---
+        
+        function initialize() {
+            const mainAccordionContainer = document.getElementById('main-accordion-container');
+
+            document.getElementById('add-main-section-btn').onclick = () => addSection(documentData, mainAccordionContainer);
+            document.getElementById('remove-main-section-btn').onclick = () => removeLastSection(documentData, mainAccordionContainer);
+            document.getElementById('export-json-btn').onclick = exportJSON;
+            document.getElementById('import-json-btn').onclick = importJSON;
+
+            renderAccordion(mainAccordionContainer, documentData);
+        }
+
+        // Start the application
+        initialize();
+    </script>
+
+</body>
+</html>
