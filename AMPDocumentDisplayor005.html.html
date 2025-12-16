@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accordion Content Displayer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .content-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+            padding: 0 1.5rem; /* Match the pl-6 padding */
+        }
+        .section-display.open > .content-body {
+            max-height: 2000px; /* Large enough value for content */
+            transition: max-height 0.4s ease-in, padding 0.4s ease-in;
+            padding: 1rem 1.5rem 1.5rem;
+        }
+        .section-header .arrow {
+            transition: transform 0.3s ease-in-out;
+        }
+        .section-display.open > .section-header .arrow {
+            transform: rotate(90deg);
+        }
+        /* Style for the actual content text */
+        .content-text {
+            white-space: pre-wrap; /* MODIFIED: Respects newlines and prevents wrapping */
+            overflow-x: auto; /* ADDED: Adds a horizontal scrollbar if content overflows */
+            background-color: #f8fafc; /* A very light gray */
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #e2e8f0;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 p-4 sm:p-6 md:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <h1 class="text-2xl sm:text-3xl font-bold mb-2 text-gray-900">Document Reader</h1>
+            <p class="text-gray-600 mb-4">Paste the JSON data from the editor page below and click "Render Document" to view the formatted content.</p>
+            
+            <textarea id="json-input-area" class="w-full h-40 p-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="Paste your JSON here..."></textarea>
+            
+            <button id="render-btn" class="mt-4 w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                Render Document
+            </button>
+        </div>
+
+        <div id="display-container" class="bg-white p-6 rounded-xl shadow-lg">
+            <!-- Rendered content will appear here -->
+            <p class="text-gray-500">Your document will be displayed here.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        const renderButton = document.getElementById('render-btn');
+        const jsonInput = document.getElementById('json-input-area');
+        const displayContainer = document.getElementById('display-container');
+
+        /**
+         * Recursively builds the HTML for the display from the parsed JSON data.
+         * @param {Array} dataArray - The array of section objects.
+         * @param {number} level - The current nesting level (for indentation).
+         * @returns {HTMLElement} - The container element with all rendered sections.
+         */
+        function buildDisplay(dataArray, level = 0) {
+            const container = document.createElement('div');
+            container.className = level > 0 ? 'ml-6 border-l-2 border-blue-100' : '';
+
+            dataArray.forEach(item => {
+                const sectionWrapper = document.createElement('div');
+                sectionWrapper.className = 'section-display py-2';
+
+                // --- Header ---
+                const header = document.createElement('div');
+                header.className = 'section-header flex items-center p-2 cursor-pointer rounded-md hover:bg-gray-100';
+                
+                const arrow = document.createElement('span');
+                arrow.className = 'arrow text-blue-500 font-bold mr-3';
+                arrow.innerHTML = '&#9654;'; // Right-pointing triangle
+
+                const title = document.createElement('h3');
+                // Adjust font size and weight based on nesting level for hierarchy
+                title.className = `font-semibold ${level === 0 ? 'text-xl' : level === 1 ? 'text-lg' : 'text-base'} text-gray-800`;
+                title.textContent = item.title || 'Untitled Section';
+
+                header.append(arrow, title);
+
+                // --- Body ---
+                const body = document.createElement('div');
+                body.className = 'content-body';
+
+                // Display the main content of the section
+                if (item.content) {
+                    const contentBlock = document.createElement('div');
+                    contentBlock.className = 'content-text';
+                    contentBlock.textContent = item.content;
+                    body.appendChild(contentBlock);
+                }
+
+                // If there are children, build them recursively
+                if (item.children && item.children.length > 0) {
+                    const nestedContainer = buildDisplay(item.children, level + 1);
+                    // Add some top margin if there was also text content
+                    if (item.content) {
+                        nestedContainer.classList.add('mt-4');
+                    }
+                    body.appendChild(nestedContainer);
+                }
+
+                sectionWrapper.append(header, body);
+                container.appendChild(sectionWrapper);
+
+                // --- Click Event for Toggling ---
+                header.onclick = () => {
+                    sectionWrapper.classList.toggle('open');
+                };
+            });
+
+            return container;
+        }
+
+        /**
+         * Main function to trigger the parsing and rendering process.
+         */
+        function renderDocument() {
+            const jsonString = jsonInput.value;
+            if (!jsonString.trim()) {
+                displayContainer.innerHTML = '<p class="text-red-500">The input is empty. Please paste your JSON data.</p>';
+                return;
+            }
+
+            try {
+                const data = JSON.parse(jsonString);
+                if (!Array.isArray(data)) {
+                    throw new Error("The root of the JSON data must be an array.");
+                }
+
+                displayContainer.innerHTML = ''; // Clear previous content
+                const renderedContent = buildDisplay(data);
+                displayContainer.appendChild(renderedContent);
+
+            } catch (error) {
+                console.error("JSON Parsing Error:", error);
+                displayContainer.innerHTML = `<p class="text-red-500"><strong>Error:</strong> Could not render document. Please ensure the JSON is valid. <br><small>${error.message}</small></p>`;
+            }
+        }
+
+        renderButton.addEventListener('click', renderDocument);
+    </script>
+
+</body>
+</html>
