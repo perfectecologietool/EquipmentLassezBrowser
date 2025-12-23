@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temporal Nexus v6.0: Dependency Flow</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f0f1a;
+            --historian-bg: #1a1a2e;
+            --architect-bg: #16213e;
+            --text-color: #e2e2e2;
+            --accent-gold: #ffd700;
+            --accent-cyan: #00fff2;
+            --accent-green: #00ff41;
+            --accent-magenta: #ff00ff;
+            --input-bg: #050505;
+            --input-border: #333;
+        }
+
+        body { margin: 0; padding: 0; font-family: 'Courier New', monospace; background-color: var(--bg-color); color: var(--text-color); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* HEADER */
+        header { height: 45px; background: #000; border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; z-index: 20; }
+        h1 { font-size: 16px; margin: 0; letter-spacing: 1px; color: var(--accent-cyan); }
+        
+        #search-container { position: relative; width: 250px; }
+        #search-input { width: 100%; background: #111; border: 1px solid #444; color: var(--accent-gold); padding: 5px 10px; font-family: inherit; }
+        
+        /* WORKSPACE */
+        #workspace { display: flex; flex: 1; position: relative; height: calc(100vh - 45px); }
+        .panel { position: relative; height: 100%; overflow: hidden; }
+        #historian-panel { flex: 1; background-color: var(--historian-bg); border-right: 4px solid #000; }
+        #architect-panel { flex: 1; background-color: var(--architect-bg); }
+        
+        .panel-label { position: absolute; top: 10px; left: 10px; font-weight: bold; opacity: 0.9; pointer-events: none; z-index: 10; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px; }
+        #lbl-hist { color: var(--accent-gold); border: 1px solid var(--accent-gold); }
+        #lbl-arch { color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+        #viz-historian, #viz-architect { width: 100%; height: 100%; }
+
+        /* CONTEXT MENU */
+        #context-menu { display: none; position: absolute; background: #222; border: 1px solid var(--accent-cyan); z-index: 1000; min-width: 220px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .ctx-item { padding: 8px 15px; cursor: pointer; border-bottom: 1px solid #333; font-size: 13px; }
+        .ctx-item:hover { background: var(--accent-cyan); color: #000; }
+        .ctx-divider { border-top: 1px solid #555; margin-top: 5px; padding-top: 5px; }
+        .ctx-danger:hover { background: #ff4444; color: #fff; }
+        .ctx-sub { font-size: 11px; color: #888; margin-left: 5px; }
+
+        /* MODAL */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; }
+        .modal { background: #151520; border: 1px solid #444; padding: 20px; width: 700px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        .modal[data-context="architect"] { border-color: var(--accent-cyan); }
+        .modal[data-context="historian"] { border-color: var(--accent-gold); }
+        .modal h2 { margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
+
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; color: #888; font-size: 11px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+        .form-input { width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); color: #fff; padding: 8px; font-family: inherit; box-sizing: border-box; }
+        
+        .question-list { background: #0a0a10; border: 1px solid #333; padding: 10px; max-height: 200px; overflow-y: auto; }
+        .q-item { margin-bottom: 8px; border-bottom: 1px solid #222; padding-bottom: 8px; }
+        .q-label { font-size: 11px; color: #aaa; display: block; margin-bottom: 2px; }
+        .q-input { width: 100%; background: #111; border: none; border-bottom: 1px solid #444; color: var(--accent-cyan); font-family: inherit; font-size: 13px; padding: 4px; }
+        .q-input:focus { outline: none; border-bottom-color: #fff; }
+
+        .btn-row { display: flex; gap: 10px; margin-top: 20px; }
+        .btn { padding: 10px 20px; border: none; cursor: pointer; font-weight: bold; flex: 1; }
+        .btn-primary { background: #444; color: #fff; }
+        .modal[data-context="architect"] .btn-primary { background: var(--accent-cyan); color: #000; }
+        .modal[data-context="historian"] .btn-primary { background: var(--accent-gold); color: #000; }
+        .btn-cancel { background: #222; color: #aaa; border: 1px solid #444; }
+
+        #file-input { display: none; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>TEMPORAL NEXUS <span style="font-size:12px; opacity:0.6;">v6.0</span></h1>
+    
+    <div id="search-container">
+        <input type="text" id="search-input" placeholder="Search..." onkeydown="handleSearch(event)">
+    </div>
+
+    <div>
+        <button class="btn" style="background:#224422; color:white; padding:5px 15px; border:1px solid #00ff41;" onclick="applyStandardLayout()">⫠ Standard</button>
+        <button class="btn" style="background:#442255; color:white; padding:5px 15px; border:1px solid #ff00ff;" onclick="applySemanticLayout()">⧉ Semantic</button>
+        <span style="display:inline-block; width:20px;"></span>
+        <button class="btn" style="background:#444; color:white; padding:5px 15px;" onclick="downloadJSON()">⇩ Export</button>
+        <button class="btn" style="background:#444; color:white; padding:5px 15px;" onclick="triggerUpload()">⇧ Import</button>
+        <button class="btn" style="background:#522; color:white; padding:5px 10px;" onclick="wipeState()">Wipe</button>
+        <input type="file" id="file-input" accept=".json" onchange="loadJSON(this)">
+    </div>
+</header>
+
+<div id="workspace">
+    <div id="historian-panel" class="panel">
+        <div id="lbl-hist" class="panel-label">◄ HISTORIAN (Diagnosis)</div>
+        <div id="viz-historian"></div>
+    </div>
+
+    <div id="architect-panel" class="panel">
+        <div id="lbl-arch" class="panel-label">ARCHITECT (Prognosis) ►</div>
+        <div id="viz-architect"></div>
+    </div>
+
+    <div id="context-menu">
+        <div class="ctx-item" onclick="triggerAction('edit')">Open Inspector</div>
+        <div class="ctx-item" onclick="triggerAction('commit')">Log Commit</div>
+        <div class="ctx-divider"></div>
+        <div class="ctx-item" onclick="triggerAction('add_dependency')">Add Dependency <span class="ctx-sub">(New → This)</span></div>
+        <div class="ctx-item" onclick="triggerAction('add_derivative')">Add Derivative <span class="ctx-sub">(This → New)</span></div>
+        <div class="ctx-item" onclick="triggerAction('interject')">Interject Parent <span class="ctx-sub">(Insert Upstream)</span></div>
+        <div class="ctx-divider"></div>
+        <div class="ctx-item" onclick="setStatus('active')" style="color:#00ff41">Set: ACTIVE</div>
+        <div class="ctx-item" onclick="setStatus('shelved')" style="color:#666">Set: SHELVED</div>
+        <div class="ctx-item" onclick="setStatus('complete')" style="color:#ffd700">Set: COMPLETE</div>
+        <div class="ctx-divider"></div>
+        <div class="ctx-item ctx-danger" onclick="triggerAction('delete')">Delete Node</div>
+    </div>
+</div>
+
+<div id="modal-overlay" class="modal-overlay">
+    <div class="modal" id="main-modal">
+        <h2 id="modal-title">Edit Node</h2>
+        <div class="form-group">
+            <label class="form-label">PROJECT NAME</label>
+            <input type="text" id="inp-label" class="form-input">
+        </div>
+
+        <div class="form-group" id="group-location" style="display:none;">
+            <label class="form-label" style="color:var(--accent-gold);">LOCATION / SYSTEM ADDRESS</label>
+            <input type="text" id="inp-location" class="form-input" placeholder="e.g. D:/Projects/Repos/">
+        </div>
+
+        <div class="form-group" id="group-lineage">
+            <label class="form-label" id="lbl-lineage">LINEAGE (Graph Rewiring)</label>
+            <div id="container-lineage"></div>
+            <div style="font-size:10px; color:#555; margin-top:2px;">*Selecting items here creates dependency arrows (Item → This)</div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" id="lbl-catalyst">CATALYST</label>
+            <div id="container-catalyst" class="question-list"></div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" id="lbl-vector">VECTOR</label>
+            <div id="container-vector" class="question-list"></div>
+        </div>
+        <div id="commit-section" style="display:none; border-top: 1px dashed #444; margin: 15px 0; padding-top: 10px;">
+            <label style="color: var(--node-commit); font-weight: bold; font-size: 12px;">COMMIT ENTRY</label>
+            <div class="form-group">
+                <textarea id="inp-commit-msg" class="form-input" style="height:80px;" placeholder="What changed?"></textarea>
+            </div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="submitModal()">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 1. VECTOR ENGINE ---
+    const VectorEngine = {
+        getFakeEmbedding: function(text) {
+            let v = [0.1, 0.1, 0.1]; 
+            const t = text.toLowerCase();
+            if (t.match(/math|calc|phys|sim|logic|matrix|algorithm|solver|node/)) v[0] += 0.8;
+            if (t.match(/function|backend|api|engine|process|server/)) v[0] += 0.5;
+            if (t.match(/ui|web|vis|graph|canvas|css|html|color|draw|render|screen/)) v[1] += 0.8;
+            if (t.match(/user|interface|button|click|mouse|frontend/)) v[1] += 0.5;
+            if (t.match(/data|store|json|file|db|memory|save|load|export/)) v[2] += 0.8;
+            if (t.match(/struct|array|object|nexus|history|log/)) v[2] += 0.5;
+            v[0] += (t.length % 10) * 0.02; v[1] += (t.length % 7) * 0.02;
+            return this.normalize(v);
+        },
+        normalize: function(v) {
+            const mag = Math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+            return [v[0]/mag, v[1]/mag, v[2]/mag];
+        },
+        cosineSimilarity: function(vecA, vecB) {
+            return (vecA[0]*vecB[0] + vecA[1]*vecB[1] + vecA[2]*vecB[2]);
+        }
+    };
+
+    // --- CONFIG ---
+    const ANCHORS = [
+        { name: "LOGIC", pos: {x: -1000, y: -1000}, vec: [1, 0, 0] },
+        { name: "VISUAL", pos: {x: 1000, y: -1000}, vec: [0, 1, 0] },
+        { name: "STRUCTURE", pos: {x: 0, y: 1000}, vec: [0, 0, 1] }
+    ];
+
+    const COL_ACTIVE = { background: '#222', border: '#00ff41' };
+    const COL_SHELVED = { background: '#111', border: '#666' };
+    const COL_COMPLETE = { background: '#221100', border: '#ffd700' };
+    const COL_DEFAULT = { background: '#222', border: '#00fff2' };
+
+    const Q_ARCH_REQ = ["Performance Requirements?", "Safety?", "Environment?", "Reliability?", "Cost?", "Timeline?"];
+    const Q_ARCH_CONOPS = ["User Persona?", "Conditions of Use?", "Success Definition?", "Edge Scenarios?"];
+    const Q_HIST_MOTIVE = ["Why do this? (Angle)", "Specific Motive?"];
+    const Q_HIST_CHALLENGE = ["How difficult was it? (Radius)", "Obstacles?"];
+
+    const archNodes = new vis.DataSet([]);
+    const archEdges = new vis.DataSet([]);
+    const histNodes = new vis.DataSet([]);
+    const histEdges = new vis.DataSet([]);
+
+    let archNetwork = null;
+    let histNetwork = null;
+    let selectedNodeId = null;
+    let currentContext = 'architect';
+    let currentAction = '';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initNetworks();
+        loadState();
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#context-menu')) document.getElementById('context-menu').style.display = 'none';
+        });
+    });
+
+    function initNetworks() {
+        const archContainer = document.getElementById('viz-architect');
+        const archOptions = {
+            layout: { hierarchical: { direction: 'UD', sortMethod: 'directed', levelSeparation: 150, nodeSpacing: 200 } }, 
+            physics: { enabled: false },
+            nodes: { shape: 'box', font: { face: 'Courier New', color: '#fff' }, borderWidth: 2, margin: 10 },
+            edges: { arrows: 'to', color: '#555', smooth: { type: 'cubicBezier' } }
+        };
+        archNetwork = new vis.Network(archContainer, { nodes: archNodes, edges: archEdges }, archOptions);
+        archNetwork.on("oncontext", (p) => handleRightClick(p, 'architect'));
+        archNetwork.on("doubleClick", (p) => handleDoubleClick(p, 'architect'));
+        archNetwork.on("click", (p) => { if(p.nodes.length) focusNode(p.nodes[0], 'historian'); });
+
+        const histContainer = document.getElementById('viz-historian');
+        const histOptions = {
+            physics: { enabled: false },
+            nodes: { shape: 'dot', size: 10, font: { face: 'Courier New', color: '#ccc', size: 12, align: 'left' }, borderWidth: 2 },
+            edges: { color: { color: '#444', opacity: 0.5 }, smooth: false }
+        };
+        histNetwork = new vis.Network(histContainer, { nodes: histNodes, edges: histEdges }, histOptions);
+        histNetwork.on("oncontext", (p) => handleRightClick(p, 'historian'));
+        histNetwork.on("click", (p) => { if(p.nodes.length) focusNode(p.nodes[0], 'architect'); });
+    }
+
+    function applyStandardLayout() {
+        archNetwork.setOptions({
+            layout: { hierarchical: { enabled: true, direction: 'UD', sortMethod: 'directed', levelSeparation: 150, nodeSpacing: 200 } },
+            physics: { enabled: false }
+        });
+        archNetwork.fit({ animation: true });
+    }
+
+    function applySemanticLayout() {
+        archNetwork.setOptions({ layout: { hierarchical: { enabled: false } } });
+        const allNodes = archNodes.get();
+        if (allNodes.length === 0) return;
+        allNodes.forEach(node => {
+            const fullText = (node.label + " " + (node.data?.catalyst || "") + " " + (node.data?.vector || "")).toLowerCase();
+            const vec = VectorEngine.getFakeEmbedding(fullText);
+            let nX=0, nY=0, den=0;
+            ANCHORS.forEach(a => {
+                const w = Math.pow(Math.max(0, VectorEngine.cosineSimilarity(vec, a.vec)), 3);
+                nX += w * a.pos.x; nY += w * a.pos.y; den += w;
+            });
+            if (den < 0.001) den = 1;
+            archNodes.update({ id: node.id, x: nX / den, y: nY / den });
+        });
+        archNetwork.fit({ animation: true });
+    }
+
+    function handleRightClick(params, context) {
+        params.event.preventDefault();
+        currentContext = context;
+        const menu = document.getElementById('context-menu');
+        selectedNodeId = params.nodes.length ? params.nodes[0] : null;
+        const offset = context === 'architect' ? document.getElementById('historian-panel').offsetWidth : 0;
+        menu.style.left = (params.pointer.DOM.x + offset) + 'px';
+        menu.style.top = params.pointer.DOM.y + 'px';
+        if (selectedNodeId) menu.style.display = 'block';
+        else if (context === 'architect') { selectedNodeId = null; triggerAction('create_root'); }
+    }
+
+    function handleDoubleClick(params, context) {
+        currentContext = context;
+        if (params.nodes.length > 0) { selectedNodeId = params.nodes[0]; triggerAction('edit'); }
+        else if (context === 'architect') { selectedNodeId = null; triggerAction('create_root'); }
+    }
+
+    function focusNode(id, targetView) {
+        const targetId = id.includes('_c_') ? id.split('_c_')[0] : id;
+        const net = targetView === 'historian' ? histNetwork : archNetwork;
+        const ds = targetView === 'historian' ? histNodes : archNodes;
+        if(ds.get(targetId)) { net.focus(targetId, { scale: 1.0, animation: true }); net.selectNodes([targetId]); }
+    }
+
+    function setStatus(status) {
+        if (!selectedNodeId) return;
+        let newColor = COL_DEFAULT;
+        if (status === 'active') newColor = COL_ACTIVE;
+        if (status === 'shelved') newColor = COL_SHELVED;
+        if (status === 'complete') newColor = COL_COMPLETE;
+        archNodes.update({ id: selectedNodeId, color: newColor, data: { status: status } });
+        histNodes.update({ id: selectedNodeId, color: { background: '#ffd700', border: newColor.border } });
+        document.getElementById('context-menu').style.display = 'none';
+        saveState();
+    }
+
+    function handleSearch(e) {
+        if (e.key === 'Enter') {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const found = archNodes.get().find(n => n.label.toLowerCase().includes(query));
+            if (found) { focusNode(found.id, 'architect'); focusNode(found.id, 'historian'); }
+        }
+    }
+
+    function triggerAction(action) {
+        document.getElementById('context-menu').style.display = 'none';
+        currentAction = action;
+        if (action === 'delete') {
+            if (selectedNodeId && confirm("Irreversible deletion. Proceed?")) {
+                archNodes.remove(selectedNodeId); histNodes.remove(selectedNodeId); saveState();
+            }
+            return;
+        }
+
+        const modal = document.getElementById('main-modal');
+        const overlay = document.getElementById('modal-overlay');
+        const title = document.getElementById('modal-title');
+        const commitSection = document.getElementById('commit-section');
+        const locationGroup = document.getElementById('group-location');
+
+        modal.setAttribute('data-context', currentContext);
+        document.getElementById('inp-label').value = '';
+        document.getElementById('inp-location').value = '';
+        document.getElementById('container-catalyst').innerHTML = '';
+        document.getElementById('container-vector').innerHTML = '';
+        document.getElementById('container-lineage').innerHTML = '';
+        commitSection.style.display = 'none';
+
+        let existingData = {};
+        if (selectedNodeId && archNodes.get(selectedNodeId)) {
+            const node = archNodes.get(selectedNodeId);
+            document.getElementById('inp-label').value = node.label;
+            document.getElementById('inp-location').value = node.data?.location || '';
+            existingData = node.data || {};
+        }
+
+        const lineageContainer = document.getElementById('container-lineage');
+        
+        if (currentContext === 'architect') {
+            locationGroup.style.display = 'none';
+            // Populate Multi-Select for Active Rewiring
+            const select = document.createElement('select'); select.multiple = true; select.className = 'form-input'; select.style.height = '120px';
+            
+            // Get currently connected parents (incoming edges)
+            const incoming = archEdges.get({ filter: i => i.to === selectedNodeId });
+            const parentIds = incoming.map(e => e.from);
+
+            archNodes.forEach(n => {
+                if (n.id === selectedNodeId) return; // Don't link self
+                const opt = document.createElement('option'); 
+                opt.value = n.id; // Use ID for wiring logic
+                opt.text = n.label;
+                
+                // Select if currently a parent
+                if (parentIds.includes(n.id)) opt.selected = true;
+                select.appendChild(opt);
+            });
+            lineageContainer.appendChild(select);
+        } else {
+            locationGroup.style.display = 'block';
+            const div = document.createElement('div'); div.className = 'form-input'; div.style.background = '#222';
+            div.innerText = existingData.lineage || "No dependencies.";
+            lineageContainer.appendChild(div);
+        }
+
+        const catalystContainer = document.getElementById('container-catalyst');
+        const vectorContainer = document.getElementById('container-vector');
+
+        if (currentContext === 'architect') {
+            if (action === 'create_root') title.innerText = "New Genesis Block";
+            else if (action === 'add_dependency') title.innerText = "Add Dependency (Prerequisite)";
+            else if (action === 'add_derivative') title.innerText = "Add Derivative (Consequence)";
+            else title.innerText = "Architectural Plan";
+            
+            renderQuestionInputs(catalystContainer, Q_ARCH_REQ, existingData.catalyst);
+            renderQuestionInputs(vectorContainer, Q_ARCH_CONOPS, existingData.vector);
+        } else {
+            title.innerText = "Diagnostic Review";
+            renderQuestionInputs(catalystContainer, Q_HIST_MOTIVE, existingData.catalyst);
+            renderQuestionInputs(vectorContainer, Q_HIST_CHALLENGE, existingData.vector);
+        }
+
+        if (action === 'commit') { commitSection.style.display = 'block'; title.innerText = "Log Commit"; }
+        overlay.style.display = 'flex';
+    }
+
+    function renderQuestionInputs(container, questions, existingTextBlock) {
+        if (existingTextBlock) {
+            const summary = document.createElement('div');
+            summary.style.padding = "5px"; summary.style.marginBottom = "10px"; summary.style.border = "1px solid #444"; summary.style.fontSize="11px"; summary.style.color="#888"; summary.style.whiteSpace = "pre-wrap";
+            summary.innerText = existingTextBlock; container.appendChild(summary);
+        }
+        questions.forEach(q => {
+            const wrapper = document.createElement('div'); wrapper.className = 'q-item';
+            const label = document.createElement('span'); label.className = 'q-label'; label.innerText = q;
+            const input = document.createElement('input'); input.type = 'text'; input.className = 'q-input'; input.dataset.question = q; 
+            wrapper.appendChild(label); wrapper.appendChild(input); container.appendChild(wrapper);
+        });
+    }
+
+    function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; }
+
+    function submitModal() {
+        const label = document.getElementById('inp-label').value;
+        const locationVal = document.getElementById('inp-location').value;
+        const lineageContainer = document.getElementById('container-lineage');
+        
+        // GENERATE NEW ID if we are creating a new node
+        const now = Date.now();
+        let id;
+        if (['create_root', 'add_dependency', 'add_derivative', 'interject'].includes(currentAction)) {
+            id = 'n_' + now; // Always fresh ID for new nodes
+        } else {
+            id = selectedNodeId || 'n_' + now;
+        }
+
+        // Lineage Rewiring Logic (Only in Architect View)
+        let lineageStr = "";
+        let selectedParents = [];
+        if (currentContext === 'architect') {
+            const select = lineageContainer.querySelector('select');
+            if (select) {
+                selectedParents = Array.from(select.selectedOptions).map(opt => opt.value);
+                const labels = Array.from(select.selectedOptions).map(opt => opt.text);
+                lineageStr = labels.join(", ");
+                
+                // If we are EDITING, we update the edges immediately
+                if (currentAction === 'edit' && selectedNodeId) {
+                    // Remove all incoming edges first
+                    const incoming = archEdges.get({ filter: i => i.to === selectedNodeId });
+                    archEdges.remove(incoming.map(e => e.id));
+                    
+                    // Add new edges (Parent -> This)
+                    selectedParents.forEach(pid => {
+                        archEdges.add({ from: pid, to: selectedNodeId });
+                    });
+                }
+            }
+        } else {
+            lineageStr = lineageContainer.innerText;
+        }
+
+        const harvest = (c) => { let s=""; c.querySelectorAll('input').forEach(i=>{if(i.value.trim()) s+=`> ${i.dataset.question}\n  ${i.value}\n`}); return s; };
+        let catalystStr = harvest(document.getElementById('container-catalyst'));
+        let vectorStr = harvest(document.getElementById('container-vector'));
+        
+        let oldData = {};
+        if (currentAction === 'edit' || currentAction === 'commit') {
+             if (selectedNodeId && archNodes.get(selectedNodeId)) {
+                 oldData = archNodes.get(selectedNodeId).data;
+             }
+        }
+        
+        if (oldData.catalyst && catalystStr) catalystStr = oldData.catalyst + "\n" + catalystStr; else if(!catalystStr) catalystStr = oldData.catalyst || "";
+        if (oldData.vector && vectorStr) vectorStr = oldData.vector + "\n" + vectorStr; else if(!vectorStr) vectorStr = oldData.vector || "";
+        const newLocation = (currentContext === 'historian' && locationVal) ? locationVal : (oldData.location || "");
+
+        const metaData = { ...oldData, lineage: lineageStr, catalyst: catalystStr, vector: vectorStr, location: newLocation };
+
+        if (currentAction === 'create_root') {
+            createNode(id, label, metaData, null);
+        }
+        else if (currentAction === 'add_dependency') {
+            // New -> Selected
+            createNode(id, label, metaData, null);
+            archEdges.add({ from: id, to: selectedNodeId }); 
+            histEdges.add({ from: id, to: selectedNodeId, dashes: true });
+        }
+        else if (currentAction === 'add_derivative') {
+            // Selected -> New
+            createNode(id, label, metaData, null);
+            archEdges.add({ from: selectedNodeId, to: id });
+            histEdges.add({ from: selectedNodeId, to: id, dashes: true });
+        }
+        else if (currentAction === 'interject') {
+            // Logic: Insert New "Upstream".
+            // 1. Identify Parents of Selected.
+            const parents = archEdges.get({ filter: i => i.to === selectedNodeId });
+            // 2. Create New Node.
+            createNode(id, label, metaData, null);
+            // 3. Move Parent Arrows to New Node.
+            parents.forEach(edge => {
+                archEdges.remove(edge.id);
+                archEdges.add({ from: edge.from, to: id });
+            });
+            // 4. Point New Node to Selected.
+            archEdges.add({ from: id, to: selectedNodeId });
+        } 
+        else if (currentAction === 'edit') {
+            archNodes.update({ id: id, label: label, data: metaData });
+            histNodes.update({ id: id, label: label });
+        } else if (currentAction === 'commit') {
+            const msg = document.getElementById('inp-commit-msg').value;
+            const commitId = id + '_c_' + now;
+            const parentHist = histNodes.get(id);
+            if (parentHist) {
+                const existingCommits = histNodes.get({ filter: i => i.id.startsWith(id + '_c_') });
+                histNodes.add({
+                    id: commitId, label: '', title: msg, group: 'commit', shape: 'dot', size: 5, color: '#4ecdc4',
+                    x: histNodes.length * 200, y: parentHist.y + 50 + (existingCommits.length * 30)
+                });
+                histEdges.add({ from: id, to: commitId, dashes: true });
+            }
+        }
+        closeModal(); saveState();
+    }
+
+    function createNode(id, label, data, parentId) {
+        if (archNodes.get(id)) return;
+        archNodes.add({ id: id, label: label, data: data, color: COL_DEFAULT });
+        const hX = histNodes.length * 200;
+        const hY = histNodes.length * 100;
+        histNodes.add({ id: id, label: label, x: hX, y: hY, color: { background: '#ffd700', border: '#00fff2' } });
+        // Note: Default link logic handled in submitModal now for flexibility
+        if (parentId) { archEdges.add({ from: parentId, to: id }); histEdges.add({ from: parentId, to: id, dashes: true }); }
+    }
+
+    function saveState() {
+        const state = { archNodes: archNodes.get(), archEdges: archEdges.get(), histNodes: histNodes.get(), histEdges: histEdges.get() };
+        localStorage.setItem('temporalNexusV6', JSON.stringify(state));
+    }
+    function loadState() {
+        const stored = localStorage.getItem('temporalNexusV6');
+        if (stored) {
+            try {
+                const data = JSON.parse(stored);
+                archNodes.clear(); archEdges.clear(); histNodes.clear(); histEdges.clear();
+                archNodes.add(data.archNodes); archEdges.add(data.archEdges);
+                histNodes.add(data.histNodes); histEdges.add(data.histEdges);
+            } catch(e) { console.error(e); }
+        } else if (archNodes.length === 0) createNode('n_genesis', "The Great Goal", {}, null);
+    }
+    function downloadJSON() {
+        const state = { archNodes: archNodes.get(), archEdges: archEdges.get(), histNodes: histNodes.get(), histEdges: histEdges.get() };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+        const a = document.createElement('a'); a.href = dataStr; a.download = "nexus_v6_" + Date.now() + ".json";
+        document.body.appendChild(a); a.click(); a.remove();
+    }
+    function triggerUpload() { document.getElementById('file-input').click(); }
+    function loadJSON(input) {
+        const file = input.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) { 
+            localStorage.setItem('temporalNexusV6', e.target.result); 
+            location.reload(); 
+        };
+        reader.readAsText(file);
+    }
+    function wipeState() { if(confirm("WIPE?")) { localStorage.removeItem('temporalNexusV6'); location.reload(); } }
+
+</script>
+</body>
+</html>
