@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life OS - Merged Edition (v4.2)</title>
+    <style>
+        :root{--bg-color:#1a1a1d;
+--card-bg:#2c2c31;
+--primary-color:#6f2232;
+--secondary-color:#950740;
+--text-color:#c3c3c3;
+--text-bright:#ffffff;
+--accent-color:#4e4e50;
+--done-color:#2a9d8f;
+--doing-color:#e9c46a;
+--todo-color:#f4a261;
+--timer-color:var(--doing-color)}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+background-color:var(--bg-color);
+color:var(--text-color);
+margin:0;
+padding:20px;
+display:flex;
+flex-direction:column;
+align-items:center;
+gap:30px}h1,h2,h3{color:var(--text-bright);
+margin:0;
+text-align:center}.container{width:100%;
+max-width:1200px;
+background-color:var(--card-bg);
+border-radius:12px;
+padding:20px;
+box-shadow:0 4px 15px rgba(0,0,0,.4)}.btn{padding:12px 25px;
+border:none;
+border-radius:5px;
+font-size:1em;
+font-weight:700;
+cursor:pointer;
+transition:all .2s ease}.btn:hover{transform:translateY(-2px);
+filter:brightness(1.1)}#earth-view{border:2px solid var(--secondary-color)}#revolver-chamber{background-color:var(--bg-color);
+padding:25px;
+border-radius:8px;
+text-align:center;
+min-height:150px;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+transition:all .3s ease}#timer-display{display:none;
+text-align:center}#timer-stage-name{font-size:1.2em;
+color:var(--accent-color);
+font-weight:700}#timer-countdown{font-size:4em;
+font-weight:700;
+color:var(--timer-color);
+margin:10px 0;
+letter-spacing:2px}#current-task-project{font-size:.9em;
+color:var(--accent-color);
+font-weight:700;
+text-transform:uppercase}#current-task-name{font-size:1.8em;
+color:var(--text-bright);
+margin:10px 0}#task-url-link{color:var(--todo-color);
+text-decoration:none;
+font-size:.9em;
+margin-top:5px;
+display:inline-block}#task-url-link:hover{text-decoration:underline}#revolver-controls,#timer-controls{display:flex;
+justify-content:center;
+gap:15px;
+margin-top:20px}#timer-controls{display:none}.btn-start{background-color:var(--doing-color);
+color:var(--bg-color)}.btn-done{background-color:var(--done-color);
+color:var(--bg-color)}.btn-next{background-color:var(--accent-color);
+color:var(--text-bright)}.btn-cancel{background-color:var(--primary-color);
+color:var(--text-bright)}#journal-view{border:2px solid var(--accent-color)}.journal-section{background-color:var(--bg-color);
+border-radius:8px;
+margin-bottom:20px;
+padding:20px}.journal-section h3{margin-bottom:15px;
+color:var(--text-bright);
+border-bottom:1px solid var(--accent-color);
+padding-bottom:10px}.journal-subsection{margin-bottom:20px}.journal-subsection h4{color:var(--text-color);
+margin-bottom:10px}.prompt-text{font-style:italic;
+margin-bottom:8px;
+display:block}.journal-textarea{width:97%;
+background-color:var(--card-bg);
+color:var(--text-color);
+border:1px solid var(--accent-color);
+border-radius:5px;
+padding:10px;
+min-height:80px;
+margin-bottom:15px;
+font-size:1em}.save-container{text-align:right}.btn-save-journal{background-color:var(--done-color);
+color:var(--bg-color);
+padding:8px 18px}.save-confirmation{color:var(--done-color);
+margin-right:10px;
+font-style:italic;
+opacity:0;
+transition:opacity .5s ease}.save-confirmation.visible{opacity:1}#solar-system-view h2{margin-bottom:20px}.project-board{margin-bottom:30px}.kanban-container{display:grid;
+grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+gap:20px}.kanban-column{background-color:var(--bg-color);
+border-radius:8px;
+padding:15px}.kanban-column h3{color:var(--text-color);
+margin-bottom:15px}.kanban-column[data-status=todo] h3{color:var(--todo-color)}.kanban-column[data-status=doing] h3{color:var(--doing-color)}.kanban-column[data-status=done] h3{color:var(--done-color)}.kanban-tasks{min-height:100px;
+display:flex;
+flex-direction:column;
+gap:10px}.task-card{background-color:var(--card-bg);
+padding:15px;
+border-radius:5px;
+box-shadow:0 2px 5px rgba(0,0,0,.3);
+cursor:grab;
+display:flex;
+flex-direction:column}.task-card:active{cursor:grabbing}.task-card.dragging{opacity:.5}.task-card-link{font-size:.8em;
+margin-top:8px;
+}.task-card-link a{color:var(--todo-color);
+text-decoration:none}.task-card-link a:hover{text-decoration:underline}.task-card-duedate{font-size:.8em;
+font-weight:700;
+color:var(--secondary-color);
+margin-top:8px;
+align-self:flex-start}#data-management{text-align:center}#data-management textarea{width:97%;
+height:150px;
+margin-top:15px;
+background-color:var(--bg-color);
+color:var(--text-color);
+border:1px solid var(--accent-color);
+border-radius:5px;
+padding:10px}
+        #quick-task-entry { border: 2px dashed var(--accent-color);
+ }
+        .quick-task-form { display: flex;
+ flex-wrap: wrap;
+ gap: 15px;
+ align-items: center;
+ justify-content: center;
+ }
+        .quick-task-form input[type="text"] { flex-grow: 1;
+ min-width: 250px;
+ }
+        .quick-task-form input { background-color: var(--bg-color);
+ color: var(--text-color);
+ border: 1px solid var(--accent-color);
+ border-radius: 5px;
+ padding: 12px;
+ font-size: 1em;
+ }
+        .btn-add-task { background-color: var(--secondary-color);
+ color: var(--text-bright);
+ }
+    </style>
+</head>
+<body>
+
+    <h1>Life OS</h1>
+
+    <div id="earth-view" class="container">
+        <h2>🌍 Earth - Today's Focus (Usage Day <span id="usage-day-display">1</span>)</h2>
+        <div id="revolver-chamber">
+            <div id="timer-display"><div id="timer-stage-name"></div><div id="timer-countdown"></div></div>
+            <div id="task-display">
+                <span id="current-task-project"></span>
+                <h3 id="current-task-name"></h3>
+                <a id="task-url-link" href="#" target="_blank" rel="noopener noreferrer" style="display: none;
+">🔗 Open Task Resource</a>
+            </div>
+        </div>
+        <div id="revolver-controls">
+            <button id="btn-start" class="btn btn-start">Start Focus Session</button>
+            <button id="btn-done" class="btn btn-done">Mark as Done</button>
+            <button id="btn-next" class="btn btn-next">Spin (Next Task)</button>
+        </div>
+        <div id="timer-controls"><button id="btn-cancel" class="btn btn-cancel">Cancel Focus Session</button></div>
+    </div>
+    
+    <div id="quick-task-entry" class="container">
+        <h2>⚡ Quick Task Entry</h2>
+        <div class="quick-task-form">
+            <input type="text" id="quick-task-desc" placeholder="Enter a task with a real-world deadline...">
+            <input type="date" id="quick-task-date">
+            <button id="btn-add-quick-task" class="btn btn-add-task">Add Dated Task</button>
+        </div>
+    </div>
+
+    <div id="journal-view" class="container" style="display: none;
+">
+        <h2>📖 Contextual Journal</h2>
+        <div id="journal-container"></div>
+    </div>
+
+    <div id="solar-system-view" class="container">
+        <h2>☀️ Solar System - All Projects & Tasks</h2>
+        <div id="boards-container"></div>
+    </div>
+    
+    <div id="data-management" class="container">
+        <h2>💾 Data Management</h2>
+        <p>Copy the text below to save your state. Paste a backup here and click 'Load' to restore.</p>
+        <button id="btn-load" class="btn">Load from Text</button>
+        <textarea id="json-data-area" spellcheck="false"></textarea>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    let solarSystem = {};
+
+    const journalPrompts = {
+        day: { title: "Day & Night: Executable Tasks", start: ["What perfect actions can I commit to today that align with my values and long-term goals?", "How can I balance my energy today to avoid unnecessary work while still accomplishing what is necessary?"], end: ["Did I fulfill the tasks I set for today? Where did I succeed, and where did I fall short?", "What obstacles caused misalignment with my values today, and how can I overcome them tomorrow?"] },
+        week: { title: "Week: All-Encompassing Tasks", start: ["What series of tasks will ensure balance between the various areas of my life this week (spiritual, relational, personal development)?", "How can I make time for both meaningful work and necessary mundane tasks without becoming overwhelmed?"], end: ["Did I achieve balance in my tasks this week, or was I too focused on one area to the detriment of others?", "How can I refine my approach for next week to ensure I grow holistically and avoid burnout?"] },
+        month: { title: "Month: A Project or Sub-Project Cycle", start: ["What new project or subproject should I begin this month, and how can I align it with my long-term goals?", "What resources or preparation do I need to successfully initiate this project?"], end: ["Did I complete my project or subproject? What went wrong, and what needs correction?", "How did my actions this month align with my values and long-term vision?"] },
+        season: { title: "Season: A Three-Month Focus", start: ["What is the primary theme or goal for this 3-month season?", "What major milestones must I achieve to consider this season a success?"], end: ["Did I achieve my seasonal goal? What were the key outcomes?", "What lessons from this season will I carry into the next?"] },
+        year: { title: "Year: A 13-Month Journey", start: ["What is my grand vision for this 13-month cycle?", "What foundational habits or systems must I establish to support this vision?"], end: ["Reflecting on the entire year, how have I transformed?", "What were the most significant challenges and victories, and what do they teach me about my path forward?"] }
+    };
+
+
+    const defaultData = {
+        time: { usageDayCounter: 1, lastUsedDate: "" },
+        curriculums: [
+            { id: "proj_quick_tasks", name: "Dated & Quick Tasks", priority: 10, tasks: [] },
+            {
+                id: "proj_ossu", name: "OSSU Computer Science", tasks: [
+                    { id: "ossu_1", name: "Complete Intro to CS", addr: "https://github.com/ossu/computer-science/blob/master/README.md#introduction-to-computer-science", status: "done" },
+                    { id: "ossu_2", name: "Core Programming", addr: "https://github.com/ossu/computer-science/blob/master/README.md#core-programming", status: "doing" },
+                    { id: "ossu_3", name: "Core Math", addr: "https://github.com/ossu/computer-science/blob/master/README.md#core-math", status: "todo" },
+                ]
+            }
+        ],
+        recurring: { daily: [], weekly: [], dateless: [] },
+        journal: { day: {}, week: {}, month: {}, season: {}, year: {} },
+        journalArchive: { day: {}, week: {}, month: {}, season: {}, year: {} }
+    };
+
+
+    let revolverChambers = [];
+
+    let currentChamberIndex = 0;
+
+    const MODULOS = { day: 1, week: 7, month: 28, season: 84, year: 364 };
+ 
+    
+    function handleAddQuickTask() {
+        const descInput = document.getElementById('quick-task-desc');
+
+        const dateInput = document.getElementById('quick-task-date');
+
+        const desc = descInput.value.trim();
+
+        const date = dateInput.value;
+
+        if (!desc || !date) { alert("Please provide both a task description and a due date.");
+ return;
+ }
+        const todayKey = getLocalDateKey();
+
+        const status = date < todayKey ? 'done' : 'doing';
+
+        const newTask = { id: 'qt_' + Date.now(), name: desc, dueDate: date, status: status };
+
+        let quickTaskProject = solarSystem.curriculums.find(p => p.id === 'proj_quick_tasks');
+
+        if (!quickTaskProject) {
+            quickTaskProject = { id: 'proj_quick_tasks', name: 'Dated & Quick Tasks', priority: 10, tasks: [] };
+
+            solarSystem.curriculums.unshift(quickTaskProject);
+
+        }
+        quickTaskProject.tasks.push(newTask);
+
+        descInput.value = '';
+
+        dateInput.value = '';
+
+        renderKanbanBoards();
+
+        buildAndShuffleRevolver();
+
+        displayCurrentChamber();
+
+        updateJsonDataArea();
+
+        alert(`Task "${desc}" added to the '${status}' column.`);
+
+    }
+
+    function buildAndShuffleRevolver() {
+        revolverChambers = [];
+
+        const realWorldToday = new Date().getDay();
+ 
+        solarSystem.curriculums.forEach(proj => {
+            let nextTask = proj.tasks.find(t => t.status === 'doing');
+
+            if (!nextTask) { nextTask = proj.tasks.find(t => t.status === 'todo');
+ }
+            if (nextTask) {
+                const priority = proj.priority || 1;
+
+                for (let i = 0;
+ i < priority;
+ i++) {
+                     revolverChambers.push({ ...nextTask, projectName: proj.name, type: 'curriculum', projectId: proj.id });
+
+                }
+            }
+        });
+
+        solarSystem.recurring.daily.forEach(task => { revolverChambers.push({ ...task, projectName: "Daily Habit", type: 'daily' });
+ });
+
+        solarSystem.recurring.weekly.forEach(task => { if (task.day === realWorldToday) { revolverChambers.push({ ...task, projectName: "Weekly Task", type: 'weekly' });
+ } });
+
+        for (let i = revolverChambers.length - 1;
+ i > 0;
+ i--) { const j = Math.floor(Math.random() * (i + 1));
+ [revolverChambers[i], revolverChambers[j]] = [revolverChambers[j], revolverChambers[i]];
+ }
+    }
+
+    function displayCurrentChamber() {
+        const journalView = document.getElementById('journal-view');
+
+        const taskNameEl = document.getElementById('current-task-name');
+
+        const projectNameEl = document.getElementById('current-task-project');
+
+        const urlLinkEl = document.getElementById('task-url-link');
+
+        if (revolverChambers.length === 0) {
+            taskNameEl.textContent = "All tasks for today are done! 🎉";
+
+            projectNameEl.textContent = "Relax or Plan Ahead";
+
+            urlLinkEl.style.display = 'none';
+ journalView.style.display = 'none';
+ return;
+
+        }
+        if (currentChamberIndex >= revolverChambers.length) currentChamberIndex = 0;
+
+        const currentTask = revolverChambers[currentChamberIndex];
+
+        taskNameEl.textContent = currentTask.name;
+
+        projectNameEl.textContent = currentTask.projectName;
+
+        if (currentTask.addr && (currentTask.addr.startsWith('http://') || currentTask.addr.startsWith('https://'))) {
+            urlLinkEl.href = currentTask.addr;
+
+            urlLinkEl.style.display = 'inline-block';
+
+        } else {
+            urlLinkEl.style.display = 'none';
+
+        }
+        journalView.style.display = (currentTask.type === 'curriculum') ? 'block' : 'none';
+
+    }
+
+    function handleStartFocus() {
+        if (revolverChambers.length === 0) return;
+
+        const currentTaskInfo = revolverChambers[currentChamberIndex];
+
+        if (currentTaskInfo.type !== 'curriculum') { alert("Focus sessions are for curriculum tasks. For habits, just do them and click 'Mark as Done'.");
+ return;
+ }
+        const project = solarSystem.curriculums.find(p => p.id === currentTaskInfo.projectId);
+
+        const task = project.tasks.find(t => t.id === currentTaskInfo.id);
+
+        if (task && task.status !== 'done') {
+            if (task.addr && (task.addr.startsWith('http://') || task.addr.startsWith('https://'))) {
+                window.open(task.addr, '_blank');
+
+            }
+            task.status = 'doing';
+
+            renderKanbanBoards();
+
+            startTimer(1);
+
+        }
+    }
+    
+    function renderKanbanBoards() {
+        const container = document.getElementById('boards-container');
+
+        container.innerHTML = '';
+
+        solarSystem.curriculums.forEach(project => {
+            const projectBoard = document.createElement('div');
+
+            projectBoard.className = 'project-board';
+
+            projectBoard.innerHTML = `<h3>${project.name} (Priority: ${project.priority || 1})</h3>`;
+
+            const kanbanContainer = document.createElement('div');
+
+            kanbanContainer.className = 'kanban-container';
+
+            kanbanContainer.dataset.projectId = project.id;
+
+            ['todo', 'doing', 'done'].forEach(status => {
+                const column = document.createElement('div');
+
+                column.className = 'kanban-column';
+
+                column.dataset.status = status;
+
+                column.innerHTML = `<h3>${status.charAt(0).toUpperCase() + status.slice(1)}</h3><div class="kanban-tasks"></div>`;
+
+                const tasksContainer = column.querySelector('.kanban-tasks');
+
+                project.tasks.filter(t => t.status === status).forEach(task => {
+                    const taskCard = document.createElement('div');
+
+                    taskCard.className = 'task-card';
+
+                    taskCard.draggable = true;
+
+                    taskCard.dataset.taskId = task.id;
+
+                    let cardHTML = `<span>${task.name}</span>`;
+
+                    if (task.addr && (task.addr.startsWith('http://') || task.addr.startsWith('https://'))) {
+                        cardHTML += `<div class="task-card-link"><a href="${task.addr}" target="_blank" rel="noopener noreferrer">🔗 Resource Link</a></div>`;
+
+                    }
+                    if (task.dueDate) {
+                        cardHTML += `<div class="task-card-duedate">Due: ${task.dueDate}</div>`;
+
+                    }
+                    taskCard.innerHTML = cardHTML;
+
+                    tasksContainer.appendChild(taskCard);
+
+                });
+
+                kanbanContainer.appendChild(column);
+
+            });
+
+            projectBoard.appendChild(kanbanContainer);
+
+            container.appendChild(projectBoard);
+
+        });
+
+        addDragAndDropListeners();
+
+    }
+
+    function getLocalDateKey(date = new Date()) { return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+ }
+    function checkAndUpdateUsageDay() { const todayKey = getLocalDateKey();
+ if (solarSystem.time.lastUsedDate !== todayKey) { if (solarSystem.time.lastUsedDate !== "") { archiveOldJournalEntries();
+ solarSystem.time.usageDayCounter++;
+ } solarSystem.time.lastUsedDate = todayKey;
+ } document.getElementById('usage-day-display').textContent = solarSystem.time.usageDayCounter;
+ }
+    function archiveOldJournalEntries() { const prevDay = solarSystem.time.usageDayCounter;
+ for (const period in MODULOS) { if (prevDay > 0 && prevDay % MODULOS[period] === 0) { const key = getJournalKeyForPeriod(period, prevDay);
+ if (solarSystem.journal[period][key]) { solarSystem.journalArchive[period][key] = solarSystem.journal[period][key];
+ delete solarSystem.journal[period][key];
+ } } } }
+    function getJournalKeyForPeriod(period, dayCounter) { const cycleNumber = Math.ceil(dayCounter / MODULOS[period]);
+ return `${period.charAt(0).toUpperCase()}${cycleNumber}`;
+ }
+    function renderJournal() { const container = document.getElementById('journal-container');
+ container.innerHTML = '';
+ const dayCounter = solarSystem.time.usageDayCounter;
+ const periods = ['day', 'week', 'month', 'season', 'year'];
+ periods.forEach(period => { const key = getJournalKeyForPeriod(period, dayCounter);
+ let prompts = journalPrompts[period];
+ if (!prompts) return;
+ if (!solarSystem.journal[period]) solarSystem.journal[period] = {};
+ if (!solarSystem.journal[period][key]) { solarSystem.journal[period][key] = { start: Array(prompts.start.length).fill(''), end: Array(prompts.end.length).fill('') };
+ } const entryData = solarSystem.journal[period][key];
+ const section = document.createElement('div');
+ section.className = 'journal-section';
+ let title = prompts.title;
+ if (MODULOS[period] > 1) { const progress = (dayCounter - 1) % MODULOS[period] + 1;
+ title += ` (Day ${progress} of ${MODULOS[period]})`;
+ } section.innerHTML = `<h3>${title}</h3>`;
+ let startHtml = '<div class="journal-subsection"><h4>Start of Period</h4>';
+ prompts.start.forEach((prompt, index) => { startHtml += `<label class="prompt-text">${prompt}</label><textarea class="journal-textarea" data-index="${index}">${entryData.start[index] || ''}</textarea>`;
+ });
+ startHtml += `<div class="save-container"><span class="save-confirmation">Saved!</span><button class="btn btn-save-journal" data-period="${period}" data-key="${key}" data-type="start">Save</button></div></div>`;
+ let endHtml = '<div class="journal-subsection"><h4>End of Period</h4>';
+ if ((dayCounter % MODULOS[period] === 0 || MODULOS[period] === 1)) { prompts.end.forEach((prompt, index) => { endHtml += `<label class="prompt-text">${prompt}</label><textarea class="journal-textarea" data-index="${index}">${entryData.end[index] || ''}</textarea>`;
+ });
+ endHtml += `<div class="save-container"><span class="save-confirmation">Saved!</span><button class="btn btn-save-journal" data-period="${period}" data-key="${key}" data-type="end">Save</button></div></div>`;
+ } else { endHtml = '';
+ } section.innerHTML += startHtml + endHtml;
+ container.appendChild(section);
+ });
+ addJournalEventListeners();
+ }
+    function addJournalEventListeners() { document.querySelectorAll('.btn-save-journal').forEach(button => { button.addEventListener('click', handleJournalSave);
+ });
+ }
+    function handleJournalSave(event) { const button = event.target;
+ const { period, key, type } = button.dataset;
+ const subsection = button.closest('.journal-subsection');
+ const textareas = subsection.querySelectorAll('.journal-textarea');
+ const answers = [];
+ textareas.forEach(ta => { answers[ta.dataset.index] = ta.value;
+ });
+ solarSystem.journal[period][key][type] = answers;
+ updateJsonDataArea();
+ const confirmation = button.previousElementSibling;
+ confirmation.classList.add('visible');
+ setTimeout(() => confirmation.classList.remove('visible'), 2000);
+ }
+    let timerInterval = null;
+ let timeRemaining = 0;
+ let currentTimerStage = 0;
+ const TIMER_STAGES = { 1: { duration: 5 * 60, name: "Focus Filter" }, 2: { duration: 20 * 60, name: "Flow Entry" }, 3: { duration: 60 * 60, name: "Deep Work" }};
+ const ui = { revolverChamber: document.getElementById('revolver-chamber'), taskDisplay: document.getElementById('task-display'), timerDisplay: document.getElementById('timer-display'), timerStageName: document.getElementById('timer-stage-name'), timerCountdown: document.getElementById('timer-countdown'), revolverControls: document.getElementById('revolver-controls'), timerControls: document.getElementById('timer-controls'), };
+ let audioCtx;
+ function playBeep(frequency = 440, duration = 100) { if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+ } const oscillator = audioCtx.createOscillator();
+ oscillator.type = 'sine';
+ oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+ oscillator.connect(audioCtx.destination);
+ oscillator.start();
+ setTimeout(() => oscillator.stop(), duration);
+ }
+    function spinRevolver() { currentChamberIndex++;
+ if (currentChamberIndex >= revolverChambers.length) { currentChamberIndex = 0;
+ } displayCurrentChamber();
+ }
+    function forceNextTaskType(type) { const nextTypedTaskIndex = revolverChambers.findIndex((task, index) => index > currentChamberIndex && task.type === type);
+ if (nextTypedTaskIndex !== -1) { currentChamberIndex = nextTypedTaskIndex;
+ } else { const firstTypedTaskIndex = revolverChambers.findIndex(task => task.type === type);
+ if (firstTypedTaskIndex !== -1) { currentChamberIndex = firstTypedTaskIndex;
+ } else { spinRevolver();
+ } } displayCurrentChamber();
+ }
+    function updateTimerDisplay() { const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
+ const seconds = (timeRemaining % 60).toString().padStart(2, '0');
+ ui.timerCountdown.textContent = `${minutes}:${seconds}`;
+ }
+    function stopTimer() { clearInterval(timerInterval);
+ timerInterval = null;
+ currentTimerStage = 0;
+ ui.timerDisplay.style.display = 'none';
+ ui.taskDisplay.style.display = 'block';
+ ui.timerControls.style.display = 'none';
+ ui.revolverControls.style.display = 'flex';
+ }
+    function handleTimerCompletion() { clearInterval(timerInterval);
+ playBeep(600, 150);
+ switch(currentTimerStage) { case 1: if (confirm("You've focused for 5 minutes. Are you in the zone and ready to continue?")) { startTimer(2);
+ } else { stopTimer();
+ spinRevolver();
+ } break;
+ case 2: startTimer(3);
+ break;
+ case 3: stopTimer();
+ handleMarkAsDone(true);
+ forceNextTaskType('daily');
+ break;
+ } }
+    function handleMarkAsDone(isAutomatic = false) { if (revolverChambers.length === 0) return;
+ let sessionNotes = "Completed via 85-minute flow session.";
+ if (!isAutomatic) { sessionNotes = prompt("Describe what you accomplished:", "");
+ if (sessionNotes === null) return;
+ } const completedTaskInfo = revolverChambers[currentChamberIndex];
+ if (completedTaskInfo.type === 'curriculum') { const project = solarSystem.curriculums.find(p => p.id === completedTaskInfo.projectId);
+ const task = project.tasks.find(t => t.id === completedTaskInfo.id);
+ if (task) task.status = 'done';
+ } revolverChambers.splice(currentChamberIndex, 1);
+ renderAllExceptRevolver();
+ displayCurrentChamber();
+ }
+    function addDragAndDropListeners() { const taskCards = document.querySelectorAll('.task-card');
+ const columns = document.querySelectorAll('.kanban-column');
+ taskCards.forEach(card => { card.addEventListener('dragstart', () => card.classList.add('dragging'));
+ card.addEventListener('dragend', () => card.classList.remove('dragging'));
+ });
+ columns.forEach(column => { column.addEventListener('dragover', e => { e.preventDefault();
+ const draggingCard = document.querySelector('.dragging');
+ column.querySelector('.kanban-tasks').appendChild(draggingCard);
+ });
+ column.addEventListener('drop', e => { e.preventDefault();
+ const droppedCard = document.querySelector('.dragging');
+ const newStatus = column.dataset.status;
+ const taskId = droppedCard.dataset.taskId;
+ const projectId = column.closest('.kanban-container').dataset.projectId;
+ const project = solarSystem.curriculums.find(p => p.id === projectId);
+ const task = project.tasks.find(t => t.id === taskId);
+ task.status = newStatus;
+ const taskElements = Array.from(column.querySelectorAll('.task-card'));
+ const newOrderedIds = taskElements.map(el => el.dataset.taskId);
+ project.tasks.sort((a, b) => newOrderedIds.indexOf(a.id) - newOrderedIds.indexOf(b.id));
+ renderAll();
+ });
+ });
+ }
+    const jsonDataArea = document.getElementById('json-data-area');
+
+    function updateJsonDataArea() { jsonDataArea.value = JSON.stringify(solarSystem, null, 2);
+ }
+    function loadState() { try { solarSystem = JSON.parse(jsonDataArea.value);
+ renderAll();
+ alert("State loaded successfully!");
+ } catch (error) { alert("Error loading data.");
+ console.error("JSON Parsing Error:", error);
+ }}
+ 
+ function startTimer(stage) {
+    if (!TIMER_STAGES[stage]) return;
+    currentTimerStage = stage;
+    timeRemaining = TIMER_STAGES[stage].duration;
+    ui.timerStageName.textContent = TIMER_STAGES[stage].name;
+    updateTimerDisplay();
+    ui.taskDisplay.style.display = 'none';
+    ui.timerDisplay.style.display = 'block';
+    ui.revolverControls.style.display = 'none';
+    ui.timerControls.style.display = 'flex';
+    timerInterval = setInterval(() => {
+        timeRemaining--;
+        updateTimerDisplay();
+        if (timeRemaining <= 0) {
+            handleTimerCompletion();
+        }
+    }, 1000);
+}
+    
+    function renderAll() {
+        checkAndUpdateUsageDay();
+ 
+        renderJournal();
+
+        renderKanbanBoards();
+
+        buildAndShuffleRevolver();
+
+        displayCurrentChamber();
+
+        updateJsonDataArea();
+
+    }
+    function renderAllExceptRevolver() {
+        renderJournal();
+
+        renderKanbanBoards();
+
+        updateJsonDataArea();
+
+    }
+    function init() {
+        solarSystem = defaultData;
+
+        document.getElementById('btn-start').addEventListener('click', handleStartFocus);
+
+        document.getElementById('btn-done').addEventListener('click', () => handleMarkAsDone(false));
+
+        document.getElementById('btn-next').addEventListener('click', spinRevolver);
+
+        document.getElementById('btn-cancel').addEventListener('click', stopTimer);
+
+        document.getElementById('btn-load').addEventListener('click', loadState);
+
+        document.getElementById('btn-add-quick-task').addEventListener('click', handleAddQuickTask);
+
+        renderAll();
+
+        console.log("Life OS Merged Version (v4.2) Initialized.");
+
+    }
+    init();
+
+});
+
+</script>
+
+</body>
+</html>
