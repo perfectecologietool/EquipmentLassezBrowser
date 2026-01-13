@@ -3,156 +3,234 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Temporal Nexus v6.0: Dependency Flow</title>
+    <title>Temporal Nexus v10.1: Safe Mode</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         :root {
             --bg-color: #0f0f1a;
             --historian-bg: #1a1a2e;
             --architect-bg: #16213e;
+            --engine-bg: #0a0a12;
+            --dock-bg: #1a1a20;
             --text-color: #e2e2e2;
             --accent-gold: #ffd700;
             --accent-cyan: #00fff2;
             --accent-green: #00ff41;
-            --accent-magenta: #ff00ff;
+            --accent-orange: #ff9900;
+            --accent-red: #ff4444;
             --input-bg: #050505;
             --input-border: #333;
+            --node-commit: #4ecdc4;
         }
 
         body { margin: 0; padding: 0; font-family: 'Courier New', monospace; background-color: var(--bg-color); color: var(--text-color); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
         /* HEADER */
-        header { height: 45px; background: #000; border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; z-index: 20; }
+        header { height: 40px; background: #000; border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; z-index: 20; flex-shrink: 0; }
         h1 { font-size: 16px; margin: 0; letter-spacing: 1px; color: var(--accent-cyan); }
         
         #search-container { position: relative; width: 250px; }
         #search-input { width: 100%; background: #111; border: 1px solid #444; color: var(--accent-gold); padding: 5px 10px; font-family: inherit; }
         
-        /* WORKSPACE */
-        #workspace { display: flex; flex: 1; position: relative; height: calc(100vh - 45px); }
-        .panel { position: relative; height: 100%; overflow: hidden; }
-        #historian-panel { flex: 1; background-color: var(--historian-bg); border-right: 4px solid #000; }
-        #architect-panel { flex: 1; background-color: var(--architect-bg); }
-        
-        .panel-label { position: absolute; top: 10px; left: 10px; font-weight: bold; opacity: 0.9; pointer-events: none; z-index: 10; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px; }
+        /* WORKSPACE LAYOUT */
+        #workspace { display: flex; flex: 1; position: relative; height: calc(100vh - 120px); }
+        #left-col { flex: 1; border-right: 4px solid #000; display: flex; flex-direction: column; }
+        #right-col { flex: 3; display: flex; flex-direction: column; }
+
+        .panel { position: relative; overflow: hidden; }
+        #historian-panel { flex: 1; background-color: var(--historian-bg); }
+        #architect-panel { flex: 2; background-color: var(--architect-bg); border-bottom: 4px solid #000; }
+        #engine-panel { flex: 1; background-color: var(--engine-bg); }
+
+        .panel-label { position: absolute; top: 10px; left: 10px; font-weight: bold; opacity: 0.9; pointer-events: none; z-index: 10; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px; font-size: 12px; }
         #lbl-hist { color: var(--accent-gold); border: 1px solid var(--accent-gold); }
         #lbl-arch { color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
-        #viz-historian, #viz-architect { width: 100%; height: 100%; }
+        #lbl-eng { color: var(--accent-orange); border: 1px solid var(--accent-orange); }
 
-        /* CONTEXT MENU */
-        #context-menu { display: none; position: absolute; background: #222; border: 1px solid var(--accent-cyan); z-index: 1000; min-width: 220px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .ctx-item { padding: 8px 15px; cursor: pointer; border-bottom: 1px solid #333; font-size: 13px; }
-        .ctx-item:hover { background: var(--accent-cyan); color: #000; }
-        .ctx-divider { border-top: 1px solid #555; margin-top: 5px; padding-top: 5px; }
-        .ctx-danger:hover { background: #ff4444; color: #fff; }
-        .ctx-sub { font-size: 11px; color: #888; margin-left: 5px; }
+        #viz-historian, #viz-architect, #viz-engine { width: 100%; height: 100%; }
 
-        /* MODAL */
+        /* ACTION DOCK */
+        #action-dock {
+            height: 80px;
+            background-color: var(--dock-bg);
+            border-top: 2px solid var(--accent-cyan);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 20px;
+            z-index: 100;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+        }
+
+        .dock-section { display: flex; align-items: center; gap: 10px; padding-right: 20px; border-right: 1px solid #444; height: 100%; }
+        .dock-section:last-child { border-right: none; }
+        .dock-info { font-size: 12px; color: #888; display: flex; flex-direction: column; justify-content: center; min-width: 200px; }
+        .dock-info-title { font-size: 14px; color: #fff; font-weight: bold; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px; }
+        .dock-info-sub { font-size: 10px; color: var(--accent-cyan); text-transform: uppercase; }
+
+        .dock-btn { background: #222; color: #ccc; border: 1px solid #444; padding: 8px 16px; font-family: inherit; font-size: 12px; font-weight: bold; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 50px; min-width: 80px; border-radius: 4px; }
+        .dock-btn:hover:not(:disabled) { background: #333; color: #fff; border-color: #666; transform: translateY(-2px); }
+        .dock-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+        .btn-green { border-color: #004400; color: var(--accent-green); }
+        .btn-green:hover:not(:disabled) { background: #002200; border-color: var(--accent-green); }
+        .btn-cyan { border-color: #004444; color: var(--accent-cyan); }
+        .btn-cyan:hover:not(:disabled) { background: #002222; border-color: var(--accent-cyan); }
+        .btn-red { border-color: #440000; color: var(--accent-red); }
+        .btn-red:hover:not(:disabled) { background: #220000; border-color: var(--accent-red); }
+
+        /* MODAL STYLES */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; }
         .modal { background: #151520; border: 1px solid #444; padding: 20px; width: 700px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
-        .modal[data-context="architect"] { border-color: var(--accent-cyan); }
-        .modal[data-context="historian"] { border-color: var(--accent-gold); }
-        .modal h2 { margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .modal h2 { margin-top: 0; border-bottom: 1px solid #444; padding-bottom: 10px; color: var(--accent-cyan); }
 
         .form-group { margin-bottom: 15px; }
         .form-label { display: block; color: #888; font-size: 11px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
         .form-input { width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); color: #fff; padding: 8px; font-family: inherit; box-sizing: border-box; }
         
-        .question-list { background: #0a0a10; border: 1px solid #333; padding: 10px; max-height: 200px; overflow-y: auto; }
-        .q-item { margin-bottom: 8px; border-bottom: 1px solid #222; padding-bottom: 8px; }
-        .q-label { font-size: 11px; color: #aaa; display: block; margin-bottom: 2px; }
-        .q-input { width: 100%; background: #111; border: none; border-bottom: 1px solid #444; color: var(--accent-cyan); font-family: inherit; font-size: 13px; padding: 4px; }
-        .q-input:focus { outline: none; border-bottom-color: #fff; }
+        .question-list { border-left: 2px solid #333; padding-left: 10px; margin-top: 5px; }
+        .q-item { margin-bottom: 8px; }
+        .q-label { display: block; color: #aaa; font-size: 10px; margin-bottom: 2px; }
+        .q-input { width: 100%; background: #080808; border: 1px solid #333; color: #ddd; font-size: 12px; padding: 4px; }
 
         .btn-row { display: flex; gap: 10px; margin-top: 20px; }
         .btn { padding: 10px 20px; border: none; cursor: pointer; font-weight: bold; flex: 1; }
-        .btn-primary { background: #444; color: #fff; }
-        .modal[data-context="architect"] .btn-primary { background: var(--accent-cyan); color: #000; }
-        .modal[data-context="historian"] .btn-primary { background: var(--accent-gold); color: #000; }
+        .btn-primary { background: var(--accent-cyan); color: #000; }
         .btn-cancel { background: #222; color: #aaa; border: 1px solid #444; }
 
+        /* Protocol Fields */
+        .protocol-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .proto-box { background: #111; padding: 10px; border: 1px solid #333; }
+        .proto-header { color: var(--node-commit); font-size: 10px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
+
+        #error-banner { display:none; background: #500; color: #fff; padding: 10px; text-align: center; position: fixed; top: 0; width: 100%; z-index: 9999; }
         #file-input { display: none; }
     </style>
 </head>
 <body>
 
+<div id="error-banner"></div>
+
 <header>
-    <h1>TEMPORAL NEXUS <span style="font-size:12px; opacity:0.6;">v6.0</span></h1>
+    <h1>TEMPORAL NEXUS <span style="font-size:12px; opacity:0.6;">v10.1 (Safe Mode)</span></h1>
     
     <div id="search-container">
         <input type="text" id="search-input" placeholder="Search..." onkeydown="handleSearch(event)">
     </div>
 
     <div>
-        <button class="btn" style="background:#224422; color:white; padding:5px 15px; border:1px solid #00ff41;" onclick="applyStandardLayout()">⫠ Standard</button>
-        <button class="btn" style="background:#442255; color:white; padding:5px 15px; border:1px solid #ff00ff;" onclick="applySemanticLayout()">⧉ Semantic</button>
+        <button class="btn" style="background:#224422; color:white; padding:5px 15px; border:1px solid #00ff41;" onclick="applyStandardLayout()">⫠ Tree</button>
+        <button class="btn" style="background:#442255; color:white; padding:5px 15px; border:1px solid #ff00ff;" onclick="applySemanticLayout()">⧉ Free</button>
         <span style="display:inline-block; width:20px;"></span>
         <button class="btn" style="background:#444; color:white; padding:5px 15px;" onclick="downloadJSON()">⇩ Export</button>
         <button class="btn" style="background:#444; color:white; padding:5px 15px;" onclick="triggerUpload()">⇧ Import</button>
-        <button class="btn" style="background:#522; color:white; padding:5px 10px;" onclick="wipeState()">Wipe</button>
+        <button class="btn" style="background:#ff0000; color:white; padding:5px 10px;" onclick="emergencyWipe()">⚠️ RESET</button>
         <input type="file" id="file-input" accept=".json" onchange="loadJSON(this)">
     </div>
 </header>
 
 <div id="workspace">
-    <div id="historian-panel" class="panel">
-        <div id="lbl-hist" class="panel-label">◄ HISTORIAN (Diagnosis)</div>
-        <div id="viz-historian"></div>
+    <div id="left-col">
+        <div id="historian-panel" class="panel">
+            <div id="lbl-hist" class="panel-label">◄ HISTORIAN (Diagnosis)</div>
+            <div id="viz-historian"></div>
+        </div>
     </div>
-
-    <div id="architect-panel" class="panel">
-        <div id="lbl-arch" class="panel-label">ARCHITECT (Prognosis) ►</div>
-        <div id="viz-architect"></div>
+    <div id="right-col">
+        <div id="architect-panel" class="panel">
+            <div id="lbl-arch" class="panel-label">ARCHITECT (Prognosis) ►</div>
+            <div id="viz-architect"></div>
+        </div>
+        <div id="engine-panel" class="panel">
+            <div id="lbl-eng" class="panel-label">▼ ENGINE ROOM (Race Track)</div>
+            <div id="viz-engine"></div>
+        </div>
     </div>
+</div>
 
-    <div id="context-menu">
-        <div class="ctx-item" onclick="triggerAction('edit')">Open Inspector</div>
-        <div class="ctx-item" onclick="triggerAction('commit')">Log Commit</div>
-        <div class="ctx-divider"></div>
-        <div class="ctx-item" onclick="triggerAction('add_dependency')">Add Dependency <span class="ctx-sub">(New → This)</span></div>
-        <div class="ctx-item" onclick="triggerAction('add_derivative')">Add Derivative <span class="ctx-sub">(This → New)</span></div>
-        <div class="ctx-item" onclick="triggerAction('interject')">Interject Parent <span class="ctx-sub">(Insert Upstream)</span></div>
-        <div class="ctx-divider"></div>
-        <div class="ctx-item" onclick="setStatus('active')" style="color:#00ff41">Set: ACTIVE</div>
-        <div class="ctx-item" onclick="setStatus('shelved')" style="color:#666">Set: SHELVED</div>
-        <div class="ctx-item" onclick="setStatus('complete')" style="color:#ffd700">Set: COMPLETE</div>
-        <div class="ctx-divider"></div>
-        <div class="ctx-item ctx-danger" onclick="triggerAction('delete')">Delete Node</div>
+<div id="action-dock">
+    <div class="dock-section">
+        <div class="dock-info">
+            <div id="dock-title" class="dock-info-title">NO SELECTION</div>
+            <div id="dock-sub" class="dock-info-sub">Double-click empty space to create Root</div>
+        </div>
+    </div>
+    <div class="dock-section">
+        <button id="btn-edit" class="dock-btn btn-cyan" onclick="triggerAction('edit')" disabled>
+            <span>EDIT</span><span style="font-size:9px;">(Inspector)</span>
+        </button>
+        <button id="btn-commit" class="dock-btn" onclick="triggerAction('commit')" disabled>
+            <span>COMMIT</span><span style="font-size:9px;">(Log Work)</span>
+        </button>
+    </div>
+    <div class="dock-section">
+        <button id="btn-dep" class="dock-btn" onclick="triggerAction('add_dependency')" disabled><span>← PREV</span></button>
+        <button id="btn-int" class="dock-btn" onclick="triggerAction('interject')" disabled><span>↑ INSERT</span></button>
+        <button id="btn-der" class="dock-btn" onclick="triggerAction('add_derivative')" disabled><span>NEXT →</span></button>
+    </div>
+    <div class="dock-section">
+        <button id="btn-active" class="dock-btn btn-green" onclick="setStatus('active')" disabled><span>ACTIVE</span></button>
+        <button id="btn-complete" class="dock-btn" onclick="setStatus('complete')" style="color:#ffd700; border-color:#554400;" disabled><span>DONE</span></button>
+        <button id="btn-delete" class="dock-btn btn-red" onclick="triggerAction('delete')" disabled><span>DELETE</span></button>
     </div>
 </div>
 
 <div id="modal-overlay" class="modal-overlay">
     <div class="modal" id="main-modal">
         <h2 id="modal-title">Edit Node</h2>
-        <div class="form-group">
-            <label class="form-label">PROJECT NAME</label>
-            <input type="text" id="inp-label" class="form-input">
-        </div>
-
-        <div class="form-group" id="group-location" style="display:none;">
-            <label class="form-label" style="color:var(--accent-gold);">LOCATION / SYSTEM ADDRESS</label>
-            <input type="text" id="inp-location" class="form-input" placeholder="e.g. D:/Projects/Repos/">
-        </div>
-
-        <div class="form-group" id="group-lineage">
-            <label class="form-label" id="lbl-lineage">LINEAGE (Graph Rewiring)</label>
-            <div id="container-lineage"></div>
-            <div style="font-size:10px; color:#555; margin-top:2px;">*Selecting items here creates dependency arrows (Item → This)</div>
-        </div>
-        <div class="form-group">
-            <label class="form-label" id="lbl-catalyst">CATALYST</label>
-            <div id="container-catalyst" class="question-list"></div>
-        </div>
-        <div class="form-group">
-            <label class="form-label" id="lbl-vector">VECTOR</label>
-            <div id="container-vector" class="question-list"></div>
-        </div>
-        <div id="commit-section" style="display:none; border-top: 1px dashed #444; margin: 15px 0; padding-top: 10px;">
-            <label style="color: var(--node-commit); font-weight: bold; font-size: 12px;">COMMIT ENTRY</label>
+        
+        <div id="arch-fields">
             <div class="form-group">
-                <textarea id="inp-commit-msg" class="form-input" style="height:80px;" placeholder="What changed?"></textarea>
+                <label class="form-label">PROJECT NAME</label>
+                <input type="text" id="inp-label" class="form-input">
+            </div>
+
+            <div class="form-group" id="group-location" style="display:none;">
+                <label class="form-label" style="color:var(--accent-gold);">LOCATION / SYSTEM ADDRESS</label>
+                <input type="text" id="inp-location" class="form-input" placeholder="e.g. D:/Projects/Repos/">
+            </div>
+
+            <div class="form-group" id="group-lineage">
+                <label class="form-label" id="lbl-lineage">LINEAGE (Graph Rewiring)</label>
+                <div id="container-lineage"></div>
+                <div style="font-size:10px; color:#555; margin-top:2px;">*Selecting items here creates dependency arrows (Item → This)</div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" id="lbl-catalyst">CATALYST</label>
+                <div id="container-catalyst" class="question-list"></div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" id="lbl-vector">VECTOR</label>
+                <div id="container-vector" class="question-list"></div>
             </div>
         </div>
+
+        <div id="commit-section" style="display:none; border-top: 1px dashed #444; margin: 0; padding-top: 10px;">
+            <label style="color: var(--node-commit); font-weight: bold; font-size: 14px;">COMMIT PROTOCOL SUITE</label>
+            <p style="font-size:11px; color:#888; margin-top:2px;">Define how to Build, Use, and Test this specific commit.</p>
+            
+            <div class="form-group">
+                <label class="form-label" style="color:#fff;">COMMIT MESSAGE</label>
+                <textarea id="inp-commit-msg" class="form-input" style="height:60px;" placeholder="What changed?"></textarea>
+            </div>
+
+            <div class="protocol-grid">
+                <div class="proto-box">
+                    <div class="proto-header">BUILD (make.sh)</div>
+                    <textarea id="inp-commit-build" class="form-input" style="height:80px; font-size:11px;" placeholder="npm install && npm run build..."></textarea>
+                </div>
+                <div class="proto-box">
+                    <div class="proto-header">USAGE (HOWTO)</div>
+                    <textarea id="inp-commit-howto" class="form-input" style="height:80px; font-size:11px;" placeholder="Open http://localhost:3000..."></textarea>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+                <label class="form-label" style="color:var(--accent-green);">VERIFICATION (TEST.sh)</label>
+                <textarea id="inp-commit-test" class="form-input" style="height:60px; font-size:11px; border-color:var(--accent-green);" placeholder="Run unit tests... Verify output X..."></textarea>
+            </div>
+        </div>
+
         <div class="btn-row">
             <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
             <button class="btn btn-primary" onclick="submitModal()">Confirm</button>
@@ -161,240 +239,281 @@
 </div>
 
 <script>
-    // --- 1. VECTOR ENGINE ---
-    const VectorEngine = {
-        getFakeEmbedding: function(text) {
-            let v = [0.1, 0.1, 0.1]; 
-            const t = text.toLowerCase();
-            if (t.match(/math|calc|phys|sim|logic|matrix|algorithm|solver|node/)) v[0] += 0.8;
-            if (t.match(/function|backend|api|engine|process|server/)) v[0] += 0.5;
-            if (t.match(/ui|web|vis|graph|canvas|css|html|color|draw|render|screen/)) v[1] += 0.8;
-            if (t.match(/user|interface|button|click|mouse|frontend/)) v[1] += 0.5;
-            if (t.match(/data|store|json|file|db|memory|save|load|export/)) v[2] += 0.8;
-            if (t.match(/struct|array|object|nexus|history|log/)) v[2] += 0.5;
-            v[0] += (t.length % 10) * 0.02; v[1] += (t.length % 7) * 0.02;
-            return this.normalize(v);
-        },
-        normalize: function(v) {
-            const mag = Math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
-            return [v[0]/mag, v[1]/mag, v[2]/mag];
-        },
-        cosineSimilarity: function(vecA, vecB) {
-            return (vecA[0]*vecB[0] + vecA[1]*vecB[1] + vecA[2]*vecB[2]);
-        }
+    // --- GLOBAL SAFETY CHECK ---
+    window.onerror = function(msg, url, line) {
+        document.getElementById('error-banner').style.display = 'block';
+        document.getElementById('error-banner').innerText = "SYSTEM ERROR: " + msg;
     };
 
-    // --- CONFIG ---
-    const ANCHORS = [
-        { name: "LOGIC", pos: {x: -1000, y: -1000}, vec: [1, 0, 0] },
-        { name: "VISUAL", pos: {x: 1000, y: -1000}, vec: [0, 1, 0] },
-        { name: "STRUCTURE", pos: {x: 0, y: 1000}, vec: [0, 0, 1] }
-    ];
+    function emergencyWipe() {
+        if(confirm("EMERGENCY RESET: This will delete all local storage data for Temporal Nexus. Use this if the app is stuck.")) {
+            localStorage.removeItem('temporalNexusV10');
+            location.reload();
+        }
+    }
 
+    // --- V6 CONSTANTS ---
+    const Q_ARCH_REQ = ["Performance Requirements?", "Safety?", "Environment?", "Cost?"];
+    const Q_ARCH_CONOPS = ["User Persona?", "Operational Scenarios?", "Success Criteria?"];
+    const Q_HIST_MOTIVE = ["Trigger Event?", "Hypothesis?", "Hard Problem Solved?"];
+    const Q_HIST_CHALLENGE = ["Pivot Reason?", "Lesson Learned?"];
+
+    // --- CONFIG & STATE ---
     const COL_ACTIVE = { background: '#222', border: '#00ff41' };
     const COL_SHELVED = { background: '#111', border: '#666' };
     const COL_COMPLETE = { background: '#221100', border: '#ffd700' };
     const COL_DEFAULT = { background: '#222', border: '#00fff2' };
 
-    const Q_ARCH_REQ = ["Performance Requirements?", "Safety?", "Environment?", "Reliability?", "Cost?", "Timeline?"];
-    const Q_ARCH_CONOPS = ["User Persona?", "Conditions of Use?", "Success Definition?", "Edge Scenarios?"];
-    const Q_HIST_MOTIVE = ["Why do this? (Angle)", "Specific Motive?"];
-    const Q_HIST_CHALLENGE = ["How difficult was it? (Radius)", "Obstacles?"];
-
-    const archNodes = new vis.DataSet([]);
-    const archEdges = new vis.DataSet([]);
-    const histNodes = new vis.DataSet([]);
-    const histEdges = new vis.DataSet([]);
-
-    let archNetwork = null;
-    let histNetwork = null;
+    let archNodes, archEdges, histNodes, histEdges, engNodes, engEdges;
+    let archNetwork, histNetwork, engNetwork;
     let selectedNodeId = null;
-    let currentContext = 'architect';
     let currentAction = '';
+    let currentContext = 'architect'; 
+    let lastClickX = 0, lastClickY = 0;
 
     document.addEventListener('DOMContentLoaded', () => {
+        // Check Dependencies
+        if (typeof vis === 'undefined') {
+            document.getElementById('error-banner').style.display = 'block';
+            document.getElementById('error-banner').innerText = "ERROR: Vis.js library failed to load. Check your internet connection or download vis-network.min.js locally.";
+            return;
+        }
+
+        // Init DataSets
+        archNodes = new vis.DataSet([]);
+        archEdges = new vis.DataSet([]);
+        histNodes = new vis.DataSet([]);
+        histEdges = new vis.DataSet([]);
+        engNodes = new vis.DataSet([]);
+        engEdges = new vis.DataSet([]);
+
         initNetworks();
-        loadState();
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#context-menu')) document.getElementById('context-menu').style.display = 'none';
-        });
+        
+        // Wrap loadState in try-catch to prevent freezes
+        try {
+            loadState();
+        } catch(e) {
+            console.error("State Load Error:", e);
+            document.getElementById('error-banner').style.display = 'block';
+            document.getElementById('error-banner').innerText = "DATA CORRUPTION DETECTED. Please use Emergency Reset.";
+        }
+        
+        updateDock();
+        
+        // Listeners for RaceTrack (Debounced or guarded?)
+        archEdges.on('*', () => safeCalculateRaceTrack());
+        archNodes.on('*', () => safeCalculateRaceTrack());
     });
 
     function initNetworks() {
+        // Architect
         const archContainer = document.getElementById('viz-architect');
-        const archOptions = {
+        archNetwork = new vis.Network(archContainer, { nodes: archNodes, edges: archEdges }, {
             layout: { hierarchical: { direction: 'UD', sortMethod: 'directed', levelSeparation: 150, nodeSpacing: 200 } }, 
             physics: { enabled: false },
             nodes: { shape: 'box', font: { face: 'Courier New', color: '#fff' }, borderWidth: 2, margin: 10 },
             edges: { arrows: 'to', color: '#555', smooth: { type: 'cubicBezier' } }
-        };
-        archNetwork = new vis.Network(archContainer, { nodes: archNodes, edges: archEdges }, archOptions);
-        archNetwork.on("oncontext", (p) => handleRightClick(p, 'architect'));
-        archNetwork.on("doubleClick", (p) => handleDoubleClick(p, 'architect'));
-        archNetwork.on("click", (p) => { if(p.nodes.length) focusNode(p.nodes[0], 'historian'); });
+        });
+        archNetwork.on("click", (p) => { if(p.nodes.length) { currentContext = 'architect'; selectNode(p.nodes[0]); } else deselectAll(); });
+        archNetwork.on("doubleClick", (p) => {
+            if(p.nodes.length) triggerAction('edit'); 
+            else { currentContext = 'architect'; triggerAction('create_root', p.pointer.canvas); }
+        });
 
+        // Historian
         const histContainer = document.getElementById('viz-historian');
-        const histOptions = {
+        histNetwork = new vis.Network(histContainer, { nodes: histNodes, edges: histEdges }, { 
             physics: { enabled: false },
             nodes: { shape: 'dot', size: 10, font: { face: 'Courier New', color: '#ccc', size: 12, align: 'left' }, borderWidth: 2 },
-            edges: { color: { color: '#444', opacity: 0.5 }, smooth: false }
-        };
-        histNetwork = new vis.Network(histContainer, { nodes: histNodes, edges: histEdges }, histOptions);
-        histNetwork.on("oncontext", (p) => handleRightClick(p, 'historian'));
-        histNetwork.on("click", (p) => { if(p.nodes.length) focusNode(p.nodes[0], 'architect'); });
-    }
-
-    function applyStandardLayout() {
-        archNetwork.setOptions({
-            layout: { hierarchical: { enabled: true, direction: 'UD', sortMethod: 'directed', levelSeparation: 150, nodeSpacing: 200 } },
-            physics: { enabled: false }
+            edges: { color: { color: '#444', opacity: 0.5 } }
         });
-        archNetwork.fit({ animation: true });
-    }
+        histNetwork.on("click", (p) => { if(p.nodes.length) { currentContext = 'historian'; selectNode(p.nodes[0]); } });
+        histNetwork.on("doubleClick", (p) => { if(p.nodes.length) triggerAction('edit'); });
 
-    function applySemanticLayout() {
-        archNetwork.setOptions({ layout: { hierarchical: { enabled: false } } });
-        const allNodes = archNodes.get();
-        if (allNodes.length === 0) return;
-        allNodes.forEach(node => {
-            const fullText = (node.label + " " + (node.data?.catalyst || "") + " " + (node.data?.vector || "")).toLowerCase();
-            const vec = VectorEngine.getFakeEmbedding(fullText);
-            let nX=0, nY=0, den=0;
-            ANCHORS.forEach(a => {
-                const w = Math.pow(Math.max(0, VectorEngine.cosineSimilarity(vec, a.vec)), 3);
-                nX += w * a.pos.x; nY += w * a.pos.y; den += w;
-            });
-            if (den < 0.001) den = 1;
-            archNodes.update({ id: node.id, x: nX / den, y: nY / den });
+        // Engine
+        const engContainer = document.getElementById('viz-engine');
+        engNetwork = new vis.Network(engContainer, { nodes: engNodes, edges: engEdges }, {
+            physics: { enabled: false }, 
+            nodes: { shape: 'box', font: { face: 'Courier New', color: '#fff', size: 12 }, borderWidth: 1, color: { background: '#222', border: '#ff9900' }, margin: 5 },
+            edges: { arrows: 'to', color: { color: '#444', opacity: 0.8 }, smooth: { type: 'curvedCW', roundness: 0.2 } }
         });
-        archNetwork.fit({ animation: true });
+        engNetwork.on("click", (p) => { if(p.nodes.length) { currentContext = 'architect'; selectNode(p.nodes[0]); } });
     }
 
-    function handleRightClick(params, context) {
-        params.event.preventDefault();
-        currentContext = context;
-        const menu = document.getElementById('context-menu');
-        selectedNodeId = params.nodes.length ? params.nodes[0] : null;
-        const offset = context === 'architect' ? document.getElementById('historian-panel').offsetWidth : 0;
-        menu.style.left = (params.pointer.DOM.x + offset) + 'px';
-        menu.style.top = params.pointer.DOM.y + 'px';
-        if (selectedNodeId) menu.style.display = 'block';
-        else if (context === 'architect') { selectedNodeId = null; triggerAction('create_root'); }
-    }
-
-    function handleDoubleClick(params, context) {
-        currentContext = context;
-        if (params.nodes.length > 0) { selectedNodeId = params.nodes[0]; triggerAction('edit'); }
-        else if (context === 'architect') { selectedNodeId = null; triggerAction('create_root'); }
-    }
-
-    function focusNode(id, targetView) {
-        const targetId = id.includes('_c_') ? id.split('_c_')[0] : id;
-        const net = targetView === 'historian' ? histNetwork : archNetwork;
-        const ds = targetView === 'historian' ? histNodes : archNodes;
-        if(ds.get(targetId)) { net.focus(targetId, { scale: 1.0, animation: true }); net.selectNodes([targetId]); }
-    }
-
-    function setStatus(status) {
-        if (!selectedNodeId) return;
-        let newColor = COL_DEFAULT;
-        if (status === 'active') newColor = COL_ACTIVE;
-        if (status === 'shelved') newColor = COL_SHELVED;
-        if (status === 'complete') newColor = COL_COMPLETE;
-        archNodes.update({ id: selectedNodeId, color: newColor, data: { status: status } });
-        histNodes.update({ id: selectedNodeId, color: { background: '#ffd700', border: newColor.border } });
-        document.getElementById('context-menu').style.display = 'none';
-        saveState();
-    }
-
-    function handleSearch(e) {
-        if (e.key === 'Enter') {
-            const query = document.getElementById('search-input').value.toLowerCase();
-            const found = archNodes.get().find(n => n.label.toLowerCase().includes(query));
-            if (found) { focusNode(found.id, 'architect'); focusNode(found.id, 'historian'); }
+    // --- SAFE ALGORITHM ---
+    function safeCalculateRaceTrack() {
+        try {
+            calculateRaceTrack();
+        } catch(e) {
+            console.warn("RaceTrack Calc Failed:", e);
+            // Don't crash app, just don't render track
         }
     }
 
-    function triggerAction(action) {
-        document.getElementById('context-menu').style.display = 'none';
+    function calculateRaceTrack() {
+        const nodes = archNodes.get(); const edges = archEdges.get(); 
+        if(nodes.length === 0) return;
+
+        // Build Graph
+        const adj={}; const inDegree={}; const reverseAdj={};
+        nodes.forEach(n => { adj[n.id]=[]; reverseAdj[n.id]=[]; inDegree[n.id]=0; });
+        edges.forEach(e => { 
+            if(adj[e.from]) adj[e.from].push(e.to); 
+            if(reverseAdj[e.to]) reverseAdj[e.to].push(e.from); 
+            if(inDegree[e.to]!==undefined) inDegree[e.to]++; 
+        });
+
+        // Track Discovery (BFS)
+        const visited=new Set(); const tracks=[];
+        nodes.forEach(n=>{ 
+            if(!visited.has(n.id)) { 
+                const c=[]; const q=[n.id]; visited.add(n.id); 
+                let safeguard = 0;
+                while(q.length){ 
+                    if(safeguard++ > 5000) break; // Safety Break
+                    const curr=q.shift(); c.push(curr); 
+                    (adj[curr]||[]).forEach(x=>{if(!visited.has(x)){visited.add(x);q.push(x)}}); 
+                    (reverseAdj[curr]||[]).forEach(x=>{if(!visited.has(x)){visited.add(x);q.push(x)}}); 
+                } 
+                tracks.push(c); 
+            } 
+        });
+
+        // Layout
+        const pos={}; let yBase=0;
+        tracks.forEach(track=>{ 
+            const q=[]; const d={}; const roots=track.filter(x=>inDegree[x]===0);
+            (roots.length?roots:[track[0]]).forEach(r=>{q.push({id:r,d:0});d[r]=0;});
+            
+            let iterationCount = 0;
+            while(q.length){ 
+                if(iterationCount++ > 2000) { 
+                    console.log("Cycle detected or graph too deep in RaceTrack."); 
+                    break; // CYCLE BREAKER
+                }
+                const{id,d:depth}=q.shift(); 
+                
+                // Max Depth Cap
+                if(depth > 50) continue; 
+
+                (adj[id]||[]).forEach(c=>{ 
+                    if(d[c]===undefined||depth+1>d[c]){
+                        d[c]=depth+1;
+                        q.push({id:c,d:depth+1});
+                    }
+                }); 
+            }
+
+            const byD={}; track.forEach(id=>{ const dp=d[id]||0; if(!byD[dp])byD[dp]=[]; byD[dp].push(id); });
+            let maxS=0; Object.values(byD).forEach(a=>{if(a.length>maxS)maxS=a.length;});
+            Object.keys(byD).forEach(dp=>{ byD[dp].forEach((id,i)=>{ pos[id]={x:dp*180,y:yBase+(i-(byD[dp].length-1)/2)*60}; }); });
+            yBase+=(maxS*60)+150;
+        });
+
+        const eN=[]; nodes.forEach(n=>{ const p=pos[n.id]||{x:0,y:0}; eN.push({id:n.id,label:n.label,x:p.x,y:p.y,color:n.color}); });
+        engNodes.clear(); engNodes.add(eN); engEdges.clear(); engEdges.add(edges); engNetwork.fit();
+    }
+
+    // --- TRIGGER ACTION (Same as V10) ---
+    function triggerAction(action, pos=null) {
         currentAction = action;
+
         if (action === 'delete') {
             if (selectedNodeId && confirm("Irreversible deletion. Proceed?")) {
-                archNodes.remove(selectedNodeId); histNodes.remove(selectedNodeId); saveState();
+                archNodes.remove(selectedNodeId); 
+                histNodes.remove(selectedNodeId); 
+                deselectAll();
+                saveState();
             }
             return;
         }
 
-        const modal = document.getElementById('main-modal');
+        if (action === 'create_root' && pos) { lastClickX = pos.x; lastClickY = pos.y; } else { lastClickX = null; }
+
         const overlay = document.getElementById('modal-overlay');
         const title = document.getElementById('modal-title');
+        const archFields = document.getElementById('arch-fields');
         const commitSection = document.getElementById('commit-section');
         const locationGroup = document.getElementById('group-location');
-
-        modal.setAttribute('data-context', currentContext);
-        document.getElementById('inp-label').value = '';
-        document.getElementById('inp-location').value = '';
-        document.getElementById('container-catalyst').innerHTML = '';
-        document.getElementById('container-vector').innerHTML = '';
-        document.getElementById('container-lineage').innerHTML = '';
-        commitSection.style.display = 'none';
-
-        let existingData = {};
-        if (selectedNodeId && archNodes.get(selectedNodeId)) {
-            const node = archNodes.get(selectedNodeId);
-            document.getElementById('inp-label').value = node.label;
-            document.getElementById('inp-location').value = node.data?.location || '';
-            existingData = node.data || {};
-        }
-
         const lineageContainer = document.getElementById('container-lineage');
-        
-        if (currentContext === 'architect') {
-            locationGroup.style.display = 'none';
-            // Populate Multi-Select for Active Rewiring
-            const select = document.createElement('select'); select.multiple = true; select.className = 'form-input'; select.style.height = '120px';
-            
-            // Get currently connected parents (incoming edges)
-            const incoming = archEdges.get({ filter: i => i.to === selectedNodeId });
-            const parentIds = incoming.map(e => e.from);
-
-            archNodes.forEach(n => {
-                if (n.id === selectedNodeId) return; // Don't link self
-                const opt = document.createElement('option'); 
-                opt.value = n.id; // Use ID for wiring logic
-                opt.text = n.label;
-                
-                // Select if currently a parent
-                if (parentIds.includes(n.id)) opt.selected = true;
-                select.appendChild(opt);
-            });
-            lineageContainer.appendChild(select);
-        } else {
-            locationGroup.style.display = 'block';
-            const div = document.createElement('div'); div.className = 'form-input'; div.style.background = '#222';
-            div.innerText = existingData.lineage || "No dependencies.";
-            lineageContainer.appendChild(div);
-        }
-
         const catalystContainer = document.getElementById('container-catalyst');
         const vectorContainer = document.getElementById('container-vector');
 
-        if (currentContext === 'architect') {
-            if (action === 'create_root') title.innerText = "New Genesis Block";
-            else if (action === 'add_dependency') title.innerText = "Add Dependency (Prerequisite)";
-            else if (action === 'add_derivative') title.innerText = "Add Derivative (Consequence)";
-            else title.innerText = "Architectural Plan";
-            
-            renderQuestionInputs(catalystContainer, Q_ARCH_REQ, existingData.catalyst);
-            renderQuestionInputs(vectorContainer, Q_ARCH_CONOPS, existingData.vector);
-        } else {
-            title.innerText = "Diagnostic Review";
-            renderQuestionInputs(catalystContainer, Q_HIST_MOTIVE, existingData.catalyst);
-            renderQuestionInputs(vectorContainer, Q_HIST_CHALLENGE, existingData.vector);
+        document.getElementById('inp-label').value = '';
+        document.getElementById('inp-location').value = '';
+        document.getElementById('inp-commit-msg').value = '';
+        document.getElementById('inp-commit-build').value = '';
+        document.getElementById('inp-commit-howto').value = '';
+        document.getElementById('inp-commit-test').value = '';
+        catalystContainer.innerHTML = '';
+        vectorContainer.innerHTML = '';
+        lineageContainer.innerHTML = '';
+        
+        archFields.style.display = 'block';
+        commitSection.style.display = 'none';
+
+        let isCommitNode = false;
+        let existingData = {};
+
+        if (selectedNodeId) {
+            const hNode = histNodes.get(selectedNodeId);
+            const aNode = archNodes.get(selectedNodeId);
+
+            if (hNode && hNode.group === 'commit') {
+                isCommitNode = true;
+                currentAction = 'edit_commit';
+                document.getElementById('inp-commit-msg').value = hNode.title || ""; 
+                existingData = hNode.data || {};
+                document.getElementById('inp-commit-build').value = existingData.build || "";
+                document.getElementById('inp-commit-howto').value = existingData.howto || "";
+                document.getElementById('inp-commit-test').value = existingData.test || "";
+            } 
+            else if (aNode && action !== 'create_root') {
+                document.getElementById('inp-label').value = aNode.label;
+                document.getElementById('inp-location').value = aNode.data?.location || '';
+                existingData = aNode.data || {};
+            }
         }
 
-        if (action === 'commit') { commitSection.style.display = 'block'; title.innerText = "Log Commit"; }
+        if (action === 'commit' || isCommitNode) {
+            title.innerText = isCommitNode ? "EDIT COMMIT PROTOCOLS" : "LOG NEW COMMIT";
+            archFields.style.display = 'none';
+            commitSection.style.display = 'block';
+        } 
+        else {
+            title.innerText = action.replace('_', ' ').toUpperCase();
+            if (currentContext === 'architect') {
+                locationGroup.style.display = 'none';
+                if (['create_root', 'add_dependency', 'add_derivative', 'interject', 'edit'].includes(action)) {
+                    const select = document.createElement('select'); select.multiple = true; select.className = 'form-input'; select.style.height = '120px';
+                    let currentParents = [];
+                    if (action === 'edit' && selectedNodeId) currentParents = archEdges.get({ filter: i => i.to === selectedNodeId }).map(e => e.from);
+                    archNodes.forEach(n => {
+                        if (n.id === selectedNodeId && action === 'edit') return;
+                        const opt = document.createElement('option'); opt.value = n.id; opt.text = n.label;
+                        if (currentParents.includes(n.id)) opt.selected = true;
+                        select.appendChild(opt);
+                    });
+                    lineageContainer.appendChild(select);
+                }
+            } else {
+                locationGroup.style.display = 'block';
+                const div = document.createElement('div'); div.className = 'form-input'; div.style.background = '#222';
+                div.innerText = existingData.lineage || "No dependencies tracked here.";
+                lineageContainer.appendChild(div);
+            }
+
+            if (currentContext === 'architect') {
+                renderQuestionInputs(catalystContainer, Q_ARCH_REQ, existingData.catalyst);
+                renderQuestionInputs(vectorContainer, Q_ARCH_CONOPS, existingData.vector);
+            } else {
+                renderQuestionInputs(catalystContainer, Q_HIST_MOTIVE, existingData.catalyst);
+                renderQuestionInputs(vectorContainer, Q_HIST_CHALLENGE, existingData.vector);
+            }
+        }
+
         overlay.style.display = 'flex';
+        if(action !== 'commit' && !isCommitNode) document.getElementById('inp-label').focus();
     }
 
     function renderQuestionInputs(container, questions, existingTextBlock) {
@@ -414,152 +533,153 @@
     function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; }
 
     function submitModal() {
+        // COMMIT / PROTOCOL SUBMISSION
+        if (currentAction === 'commit' || currentAction === 'edit_commit') {
+            const msg = document.getElementById('inp-commit-msg').value;
+            const build = document.getElementById('inp-commit-build').value;
+            const howto = document.getElementById('inp-commit-howto').value;
+            const test = document.getElementById('inp-commit-test').value;
+            
+            const protoData = { build: build, howto: howto, test: test };
+
+            if (currentAction === 'edit_commit') {
+                histNodes.update({ id: selectedNodeId, title: msg, data: protoData });
+            } else {
+                const now = Date.now();
+                const id = selectedNodeId;
+                const commitId = id + '_c_' + now;
+                const parentHist = histNodes.get(id);
+                if (parentHist) {
+                    const existing = histNodes.get({ filter: i => i.id.startsWith(id + '_c_') });
+                    histNodes.add({
+                        id: commitId, label: '', title: msg, group: 'commit', shape: 'dot', size: 5, color: '#4ecdc4',
+                        x: histNodes.length * 100, y: parentHist.y + 50 + (existing.length * 30),
+                        data: protoData
+                    });
+                    histEdges.add({ from: id, to: commitId, dashes: true });
+                }
+            }
+            closeModal(); saveState();
+            return;
+        }
+
+        // ARCHITECT SUBMISSION
         const label = document.getElementById('inp-label').value;
         const locationVal = document.getElementById('inp-location').value;
         const lineageContainer = document.getElementById('container-lineage');
         
-        // GENERATE NEW ID if we are creating a new node
         const now = Date.now();
-        let id;
-        if (['create_root', 'add_dependency', 'add_derivative', 'interject'].includes(currentAction)) {
-            id = 'n_' + now; // Always fresh ID for new nodes
-        } else {
-            id = selectedNodeId || 'n_' + now;
-        }
-
-        // Lineage Rewiring Logic (Only in Architect View)
-        let lineageStr = "";
+        let id = (['create_root', 'add_dependency', 'add_derivative', 'interject'].includes(currentAction)) ? 'n_' + now : selectedNodeId;
+        
         let selectedParents = [];
         if (currentContext === 'architect') {
             const select = lineageContainer.querySelector('select');
-            if (select) {
-                selectedParents = Array.from(select.selectedOptions).map(opt => opt.value);
-                const labels = Array.from(select.selectedOptions).map(opt => opt.text);
-                lineageStr = labels.join(", ");
-                
-                // If we are EDITING, we update the edges immediately
-                if (currentAction === 'edit' && selectedNodeId) {
-                    // Remove all incoming edges first
-                    const incoming = archEdges.get({ filter: i => i.to === selectedNodeId });
-                    archEdges.remove(incoming.map(e => e.id));
-                    
-                    // Add new edges (Parent -> This)
-                    selectedParents.forEach(pid => {
-                        archEdges.add({ from: pid, to: selectedNodeId });
-                    });
-                }
-            }
-        } else {
-            lineageStr = lineageContainer.innerText;
+            if (select) selectedParents = Array.from(select.selectedOptions).map(opt => opt.value);
         }
 
         const harvest = (c) => { let s=""; c.querySelectorAll('input').forEach(i=>{if(i.value.trim()) s+=`> ${i.dataset.question}\n  ${i.value}\n`}); return s; };
-        let catalystStr = harvest(document.getElementById('container-catalyst'));
-        let vectorStr = harvest(document.getElementById('container-vector'));
+        const newCatalyst = harvest(document.getElementById('container-catalyst'));
+        const newVector = harvest(document.getElementById('container-vector'));
         
         let oldData = {};
-        if (currentAction === 'edit' || currentAction === 'commit') {
-             if (selectedNodeId && archNodes.get(selectedNodeId)) {
-                 oldData = archNodes.get(selectedNodeId).data;
-             }
-        }
-        
-        if (oldData.catalyst && catalystStr) catalystStr = oldData.catalyst + "\n" + catalystStr; else if(!catalystStr) catalystStr = oldData.catalyst || "";
-        if (oldData.vector && vectorStr) vectorStr = oldData.vector + "\n" + vectorStr; else if(!vectorStr) vectorStr = oldData.vector || "";
-        const newLocation = (currentContext === 'historian' && locationVal) ? locationVal : (oldData.location || "");
+        if (selectedNodeId && archNodes.get(selectedNodeId)) oldData = archNodes.get(selectedNodeId).data || {};
 
-        const metaData = { ...oldData, lineage: lineageStr, catalyst: catalystStr, vector: vectorStr, location: newLocation };
+        let catalystStr = oldData.catalyst || ""; if(newCatalyst) catalystStr = (catalystStr ? catalystStr + "\n" : "") + newCatalyst;
+        let vectorStr = oldData.vector || ""; if(newVector) vectorStr = (vectorStr ? vectorStr + "\n" : "") + newVector;
+        
+        const metaData = { ...oldData, catalyst: catalystStr, vector: vectorStr, location: locationVal || oldData.location };
 
         if (currentAction === 'create_root') {
-            createNode(id, label, metaData, null);
+            createNode(id, label, metaData, lastClickX, lastClickY);
+            selectedParents.forEach(pid => createEdge(pid, id));
         }
         else if (currentAction === 'add_dependency') {
-            // New -> Selected
             createNode(id, label, metaData, null);
-            archEdges.add({ from: id, to: selectedNodeId }); 
-            histEdges.add({ from: id, to: selectedNodeId, dashes: true });
+            createEdge(id, selectedNodeId);
+            selectedParents.forEach(pid => createEdge(pid, id));
         }
         else if (currentAction === 'add_derivative') {
-            // Selected -> New
             createNode(id, label, metaData, null);
-            archEdges.add({ from: selectedNodeId, to: id });
-            histEdges.add({ from: selectedNodeId, to: id, dashes: true });
+            createEdge(selectedNodeId, id);
+            selectedParents.forEach(pid => createEdge(pid, id));
         }
         else if (currentAction === 'interject') {
-            // Logic: Insert New "Upstream".
-            // 1. Identify Parents of Selected.
-            const parents = archEdges.get({ filter: i => i.to === selectedNodeId });
-            // 2. Create New Node.
+            const oldParents = archEdges.get({ filter: i => i.to === selectedNodeId });
             createNode(id, label, metaData, null);
-            // 3. Move Parent Arrows to New Node.
-            parents.forEach(edge => {
-                archEdges.remove(edge.id);
-                archEdges.add({ from: edge.from, to: id });
-            });
-            // 4. Point New Node to Selected.
-            archEdges.add({ from: id, to: selectedNodeId });
-        } 
+            oldParents.forEach(e => { archEdges.remove(e.id); createEdge(e.from, id); });
+            createEdge(id, selectedNodeId);
+        }
         else if (currentAction === 'edit') {
             archNodes.update({ id: id, label: label, data: metaData });
             histNodes.update({ id: id, label: label });
-        } else if (currentAction === 'commit') {
-            const msg = document.getElementById('inp-commit-msg').value;
-            const commitId = id + '_c_' + now;
-            const parentHist = histNodes.get(id);
-            if (parentHist) {
-                const existingCommits = histNodes.get({ filter: i => i.id.startsWith(id + '_c_') });
-                histNodes.add({
-                    id: commitId, label: '', title: msg, group: 'commit', shape: 'dot', size: 5, color: '#4ecdc4',
-                    x: histNodes.length * 200, y: parentHist.y + 50 + (existingCommits.length * 30)
-                });
-                histEdges.add({ from: id, to: commitId, dashes: true });
-            }
+            const oldIncoming = archEdges.get({ filter: i => i.to === id });
+            archEdges.remove(oldIncoming.map(e => e.id));
+            selectedParents.forEach(pid => createEdge(pid, id));
         }
+
         closeModal(); saveState();
+        if(currentAction !== 'edit') setTimeout(() => selectNode(id), 100);
+        else updateDock();
     }
 
-    function createNode(id, label, data, parentId) {
-        if (archNodes.get(id)) return;
-        archNodes.add({ id: id, label: label, data: data, color: COL_DEFAULT });
-        const hX = histNodes.length * 200;
-        const hY = histNodes.length * 100;
-        histNodes.add({ id: id, label: label, x: hX, y: hY, color: { background: '#ffd700', border: '#00fff2' } });
-        // Note: Default link logic handled in submitModal now for flexibility
-        if (parentId) { archEdges.add({ from: parentId, to: id }); histEdges.add({ from: parentId, to: id, dashes: true }); }
+    function createNode(id, label, data, x, y) {
+        const def = { id: id, label: label, data: data, color: COL_DEFAULT };
+        if(x!==null) { def.x = x; def.y = y; }
+        archNodes.add(def);
+        histNodes.add({ id: id, label: label, x: histNodes.length * 80, y: histNodes.length * 60, color: { background: '#ffd700', border: '#00fff2' } });
+    }
+    
+    function createEdge(from, to) {
+        if(!from || !to) return;
+        archEdges.add({ from: from, to: to });
+        histEdges.add({ from: from, to: to, dashes: true });
     }
 
-    function saveState() {
-        const state = { archNodes: archNodes.get(), archEdges: archEdges.get(), histNodes: histNodes.get(), histEdges: histEdges.get() };
-        localStorage.setItem('temporalNexusV6', JSON.stringify(state));
+    function selectNode(id) {
+        selectedNodeId = id;
+        [archNetwork, histNetwork, engNetwork].forEach(net => { if(net.body.data.nodes.get(id)) net.selectNodes([id]); });
+        updateDock();
     }
-    function loadState() {
-        const stored = localStorage.getItem('temporalNexusV6');
-        if (stored) {
-            try {
-                const data = JSON.parse(stored);
-                archNodes.clear(); archEdges.clear(); histNodes.clear(); histEdges.clear();
-                archNodes.add(data.archNodes); archEdges.add(data.archEdges);
-                histNodes.add(data.histNodes); histEdges.add(data.histEdges);
-            } catch(e) { console.error(e); }
-        } else if (archNodes.length === 0) createNode('n_genesis', "The Great Goal", {}, null);
+    function deselectAll() { selectedNodeId = null; [archNetwork, histNetwork, engNetwork].forEach(n => n.unselectAll()); updateDock(); }
+    
+    function updateDock() {
+        const titleEl = document.getElementById('dock-title');
+        const subEl = document.getElementById('dock-sub');
+        const btns = document.querySelectorAll('.dock-btn');
+        if (selectedNodeId) {
+            const node = archNodes.get(selectedNodeId) || histNodes.get(selectedNodeId);
+            titleEl.innerText = node ? (node.label || node.title || "COMMIT") : "UNKNOWN";
+            titleEl.style.color = "#fff";
+            subEl.innerText = "ID: " + selectedNodeId;
+            btns.forEach(b => b.disabled = false);
+        } else {
+            titleEl.innerText = "NO SELECTION";
+            titleEl.style.color = "#888";
+            subEl.innerText = "Double-click empty space to create Root";
+            btns.forEach(b => b.disabled = true);
+        }
     }
-    function downloadJSON() {
-        const state = { archNodes: archNodes.get(), archEdges: archEdges.get(), histNodes: histNodes.get(), histEdges: histEdges.get() };
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
-        const a = document.createElement('a'); a.href = dataStr; a.download = "nexus_v6_" + Date.now() + ".json";
-        document.body.appendChild(a); a.click(); a.remove();
+    
+    function setStatus(status) {
+        if (!selectedNodeId) return;
+        let newColor = COL_DEFAULT;
+        if (status === 'active') newColor = COL_ACTIVE;
+        if (status === 'shelved') newColor = COL_SHELVED;
+        if (status === 'complete') newColor = COL_COMPLETE;
+        archNodes.update({ id: selectedNodeId, color: newColor, data: { status: status } });
+        engNodes.update({ id: selectedNodeId, color: newColor });
+        histNodes.update({ id: selectedNodeId, color: { background: '#ffd700', border: newColor.border } });
+        saveState();
     }
+
+    function handleSearch(e) { if(e.key==='Enter') { const f = archNodes.get().find(n=>n.label.toLowerCase().includes(document.getElementById('search-input').value.toLowerCase())); if(f) selectNode(f.id); } }
+    function saveState() { localStorage.setItem('temporalNexusV10', JSON.stringify({ archNodes: archNodes.get(), archEdges: archEdges.get(), histNodes: histNodes.get(), histEdges: histEdges.get() })); }
+    function loadState() { const s=localStorage.getItem('temporalNexusV10'); if(s) { const d=JSON.parse(s); archNodes.add(d.archNodes); archEdges.add(d.archEdges); histNodes.add(d.histNodes); histEdges.add(d.histEdges); safeCalculateRaceTrack(); } else createNode('n_genesis', "The Great Goal", {}, 0, 0); }
+    function downloadJSON() { const d="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify({archNodes:archNodes.get(),archEdges:archEdges.get(),histNodes:histNodes.get(),histEdges:histEdges.get()})); const a=document.createElement('a'); a.href=d; a.download="nexus_v10_safe_"+Date.now()+".json"; document.body.appendChild(a); a.click(); a.remove(); }
     function triggerUpload() { document.getElementById('file-input').click(); }
-    function loadJSON(input) {
-        const file = input.files[0]; if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) { 
-            localStorage.setItem('temporalNexusV6', e.target.result); 
-            location.reload(); 
-        };
-        reader.readAsText(file);
-    }
-    function wipeState() { if(confirm("WIPE?")) { localStorage.removeItem('temporalNexusV6'); location.reload(); } }
+    function loadJSON(i) { const f=i.files[0]; const r=new FileReader(); r.onload=e=>{ localStorage.setItem('temporalNexusV10',e.target.result); location.reload(); }; r.readAsText(f); }
+    function applyStandardLayout() { archNetwork.setOptions({ layout: { hierarchical: { enabled: true } }, physics: { enabled: false } }); archNetwork.fit({ animation: true }); }
+    function applySemanticLayout() { archNetwork.setOptions({ layout: { hierarchical: { enabled: false } }, physics: { enabled: true } }); }
 
 </script>
 </body>
