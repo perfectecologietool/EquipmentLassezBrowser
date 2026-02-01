@@ -4,37 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <licence> 
-LICENSE
-1. The Preamble of Lowliness This software is provided not from an observation of the order found in the Holy Bible. It is intended to help the user map their life and work as a set of ArchNodes and Innovation trees, facilitating  repentance as defined by The Holy Gospel according to Saint John chapter 8 verse 11.
-
-2. The Gift of Water (Usage Rights)
-
-Individual & Educational Use: This software is free for all individuals to use for personal growth and small-scale projects.
-
-The Global South (Third World): Use is entirely free and encouraged for all individuals, engineers, and organizations in developing nations where currency exchange is prohibitive!!
-
-Philanthropic Duty: Users are reminded that "everything is already worthy of happiness," and this tool should serve to preserve and continue that existing good life created by God.
-
-3. The "Well of Wisdom" Clause (Reciprocity)
-
-Share Your Improvements: If you improve the logic of the Causal Knowledge Graphs, the Clean Architecture layers, or the Engine visualization, you are warmly invited to share those improvements back with the author.
-
-Community Growth: By sharing your code, you contribute to the "greater more complex set of tools" intended for the benefit of all life forms and the poor.
-
-4. Commercial Usage & Social Conscience
-
-Corporate Entities: Large commercial entities with significant revenue are requested (though not legally compelled under this specific draft) to contribute to the author’s mission or donate to a charity of their choice that supports the third world.
-
-No Commercial "Enclosure": You may not take this code, put it behind a paywall, and call it your own product without acknowledging the source and the Biblical principles therein according to our obedience to Jesus the God the Father, Son and Holy Spirit.
-
-Doxology of Stewardship: All work performed herein is dedicated to the glory of Jesus Christ, the Word made flesh, the Alpha and the Omega, through whom all things were made and in whom all truth resides. To Him be the glory, both now and to the days of eternity. Amen. 
-
-5. Authorship & Legacy
-
-Copyright © 2026: All rights to the original "Nexus" architecture are reserved by the author for the sake of his children and the preservation of this legacy.
- </licence>
-    <title>Temporal Nexus v14: OOP</title>
+    <title>Temporal Nexus </title>
     <scriptd type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js">
         </script>
         <script src="vis-network.min.js"></script>
@@ -780,7 +750,7 @@ Copyright © 2026: All rights to the original "Nexus" architecture are reserved 
                     <div class="help-text">• Double-tap empty space to create a root!</div>
                     <div class="help-text">• Double-tap a node to edit details!</div>
                 </div>
-                <div class="help-section" style="border-color: var(--accent-gold);">
+				                <div class="help-section" style="border-color: var(--accent-gold);">
                     <div class="help-title">📜 THE HISTORIAN</div>
                     <div class="help-text">• This tracks your past!</div>
                     <div class="help-text">• Nodes go Left to Right (Time).</div>
@@ -792,11 +762,11 @@ Copyright © 2026: All rights to the original "Nexus" architecture are reserved 
                     <div class="help-text">• When you work, work to prove your hypothesis!</div>
                     <div class="help-text">• Double-tap empty space for a new experiment!</div>
                     <div class="help-text">• Double-tap an experiment to edit!</div>
-                    <div class="help-text">• Validate or Falsify a node to iterate! Science is fun!</div>
+					<div class="help-text">• Validate or Falsify a node to iterate! Science is fun!</div>
                 </div>
             </div>
-            <div> <a href="https://gemini.google.com/share/7b2c82913e1e">see Gemini make this tool. </a></div>
-            <div class="btn-row">
+<div> <a href="https://gemini.google.com/share/7b2c82913e1e">see Gemini make this tool. </a></div>  
+  <div class="btn-row">
                 <button class="btn btn-primary"
                     onclick="document.getElementById('help-overlay').style.display='none'">OK, LET'S GO! 🚀</button>
             </div>
@@ -817,12 +787,6 @@ Copyright © 2026: All rights to the original "Nexus" architecture are reserved 
                 </div>
                 <div class="form-group"><label class="form-label" id="lbl-vector">VECTOR</label>
                     <textarea id="inp-vector" class="form-input" style="height:60px;"></textarea>
-                </div>
-                <div class="form-group"
-                    style="display:flex; align-items:center; gap:10px; border:1px solid #333; padding:10px; background:#111;">
-                    <input type="checkbox" id="inp-finished" style="width:20px; height:20px; cursor:pointer;">
-                    <label for="inp-finished" class="form-label" style="margin:0; cursor:pointer; color:#fff;">PROJECT
-                        FINISHED?</label>
                 </div>
             </div>
             <div id="commit-section"
@@ -1546,7 +1510,7 @@ Copyright © 2026: All rights to the original "Nexus" architecture are reserved 
                 const ns = [];
                 const es = [];
                 this.nodes.forEach(n => {
-                    ns.push({ id: n.id, label: n.label, color: n.isFinished ? '#842100' : '#4ecdc4' });
+                    ns.push({ id: n.id, label: n.label, color: n.isFinished ? '#ffd700' : '#4ecdc4' });
                     n.dependencies.forEach(dep => {
                         es.push({ from: n.id, to: dep.id });
                     });
@@ -1596,63 +1560,63 @@ Copyright © 2026: All rights to the original "Nexus" architecture are reserved 
             }
 
             renderEng() {
-                const ns = [];
-                const es = [];
+                // Race Track Logic
+                const nodes = [];
+                const edges = [];
 
-                // Configure Layout (Race Track: Left to Right)
-                // We utilize Vis.js hierarchical layout to enforce the flow
-                this.networks.eng.setOptions({
-                    layout: {
-                        hierarchical: {
-                            enabled: true,
-                            direction: 'LR',
-                            sortMethod: 'directed',
-                            levelSeparation: 250,
-                            nodeSpacing: 150
-                        }
-                    },
-                    physics: { enabled: false }
-                });
+                // Simple topological sort / layering based on dependencies
+                // "Left: least deps, Right: most unfinished deps"
+                // Or use existing algorithm. For speed, I'll use a simpler layer calculator.
 
-                this.nodes.forEach(n => {
-                    // Status Logic
-                    let color = '#00ff41'; // Default Green (Ready)
-                    if (n.isFinished) {
-                        color = '#4ecdc4'; // Blue (Finished)
-                    } else {
-                        // Check if blocked
-                        const blocked = n.dependencies.some(d => !d.isFinished);
-                        if (blocked) color = '#ff4444'; // Red (Blocked)
-                    }
+                const layers = new Map();
+                const processing = new Set();
 
-                    ns.push({
-                        id: n.id,
-                        label: n.label,
-                        color: {
-                            background: '#222',
-                            border: color,
-                            highlight: { border: color, background: '#444' }
-                        },
-                        borderWidth: 2
+                const getLayer = (node) => {
+                    if (layers.has(node.id)) return layers.get(node.id);
+                    if (processing.has(node.id)) return 999; // Cycle
+                    processing.add(node.id);
+
+                    let maxDepth = 0;
+                    node.dependencies.forEach(child => {
+                        maxDepth = Math.max(maxDepth, getLayer(child) + 1);
                     });
 
-                    // Edges (Reversed: Dependency -> Dependent)
-                    // "Architecting a Bridge (Dep) -> Building the Bridge (Dependent)"
-                    // We want Dependency on the LEFT. So Edge goes Dep -> Dependent.
-                    // Wait, standard graph: Parent depends on Child? Or Child depends on Parent?
-                    // In ArchNode: dependents = employers (Parents), dependencies = employees (Children).
-                    // If A depends on B. B is a dependency. B must be first.
-                    // So Edge: B -> A.
-                    // Code: n.dependencies.forEach(dep => ... )
-                    // dep is B. n is A.
-                    // es.push({ from: dep.id, to: n.id });
-                    n.dependencies.forEach(dep => {
-                        es.push({ from: dep.id, to: n.id, arrows: 'to' });
+                    processing.delete(node.id);
+                    layers.set(node.id, maxDepth);
+                    return maxDepth;
+                };
+
+                Array.from(this.nodes.values()).forEach(n => getLayer(n));
+
+                // Group by layer
+                const layerGroups = {};
+                layers.forEach((l, id) => {
+                    if (!layerGroups[l]) layerGroups[l] = [];
+                    layerGroups[l].push(this.nodes.get(id));
+                });
+
+                Object.keys(layerGroups).forEach(lStr => {
+                    const l = parseInt(lStr);
+                    const group = layerGroups[l];
+                    const x = l * 200;
+                    group.forEach((n, i) => {
+                        const y = (i - group.length / 2) * 100;
+                        nodes.push({
+                            id: n.id,
+                            label: n.label,
+                            x: x,
+                            y: y,
+                            color: {
+                                background: '#222',
+                                border: n.isFinished ? '#ffd700' : '#4ecdc4'
+                            }
+                        });
+                        n.dependencies.forEach(d => edges.push({ from: n.id, to: d.id }));
                     });
                 });
 
-                this.engData.nodes.clear(); this.engData.nodes.add(ns);
-                this.engData.edges.clear(); this.engData.edges.add(es);
+                this.engData.nodes.clear(); this.engData.nodes.add(nodes);
+                this.engData.edges.clear(); this.engData.edges.add(edges);
             }
 
             renderInn(archNodeId) {
@@ -1869,7 +1833,6 @@ Copyright © 2026: All rights to the original "Nexus" architecture are reserved 
                 // Render Questions (Simplified for brevity)
                 document.getElementById('inp-catalyst').value = n.data.catalyst || "";
                 document.getElementById('inp-vector').value = n.data.vector || "";
-                document.getElementById('inp-finished').checked = n.isFinished || false;
 
                 // Lineage (Parent selection)
                 const lContainer = document.getElementById('container-lineage'); lContainer.innerHTML = '';
@@ -1906,7 +1869,6 @@ Copyright © 2026: All rights to the original "Nexus" architecture are reserved 
                     n.label = document.getElementById('inp-label').value;
                     n.data.catalyst = document.getElementById('inp-catalyst').value;
                     n.data.vector = document.getElementById('inp-vector').value;
-                    n.isFinished = document.getElementById('inp-finished').checked;
 
                     // Update Parents
                     const select = document.getElementById('container-lineage').querySelector('select');
@@ -2325,4 +2287,34 @@ Copyright © 2026: All rights to the original "Nexus" architecture are reserved 
     </script>
 </body>
 
+  <licence> 
+LICENSE
+1. The Preamble of Lowliness This software is provided not from an observation of the order found in the Holy Bible. It is intended to help the user map their life and work as a set of ArchNodes and Innovation trees, facilitating  repentance as defined by The Holy Gospel according to Saint John chapter 8 verse 11.
+
+2. The Gift of Water (Usage Rights)
+
+Individual & Educational Use: This software is free for all individuals to use for personal growth and small-scale projects.
+
+The Global South (Third World): Use is entirely free and encouraged for all individuals, engineers, and organizations in developing nations where currency exchange is prohibitive!!
+
+Philanthropic Duty: Users are reminded that "everything is already worthy of happiness," and this tool should serve to preserve and continue that existing good life created by God.
+
+3. The "Well of Wisdom" Clause (Reciprocity)
+
+Share Your Improvements: If you improve the logic of the Causal Knowledge Graphs, the Clean Architecture layers, or the Engine visualization, you are warmly invited to share those improvements back with the author.
+
+Community Growth: By sharing your code, you contribute to the "greater more complex set of tools" intended for the benefit of all life forms and the poor.
+
+4. Commercial Usage & Social Conscience
+
+Corporate Entities: Large commercial entities with significant revenue are requested (though not legally compelled under this specific draft) to contribute to the author’s mission or donate to a charity of their choice that supports the third world.
+
+No Commercial "Enclosure": You may not take this code, put it behind a paywall, and call it your own product without acknowledging the source and the Biblical principles therein according to our obedience to Jesus the God the Father, Son and Holy Spirit.
+
+Doxology of Stewardship: All work performed herein is dedicated to the glory of Jesus Christ, the Word made flesh, the Alpha and the Omega, through whom all things were made and in whom all truth resides. To Him be the glory, both now and to the days of eternity. Amen. 
+
+5. Authorship & Legacy
+
+Copyright © 2026: All rights to the original "Nexus" architecture are reserved by the author for the sake of his children and the preservation of this legacy.
+ </licence>
 </html>
