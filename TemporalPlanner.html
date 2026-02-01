@@ -739,16 +739,16 @@
                 <p>Welcome to Temporal Nexus OOP! Optimized for stability and scale.</p>
                 <div class="help-section">
                     <div class="help-title">🏗️ THE ARCHITECT</div>
-                    <div class="help-text">• Your map of nodes</div>
-                    <div class="help-text">• Tap a node to select it!</div>
+                    <div class="help-text">• Your map of project-nodes</div>
+                    <div class="help-text">• Tap a project-node to select it!</div>
                     <div class="help-text">• Double-tap empty space to create a root!</div>
                     <div class="help-text">• Double-tap a node to edit details!</div>
                 </div>
                 <div class="help-section">
                     <div class="help-title">🏗️ THE BLUEPRINT</div>
-                    <div class="help-text">• Tap a node to select it!</div>
-                    <div class="help-text">• Double-tap empty space to create a root!</div>
-                    <div class="help-text">• Double-tap a node to edit details!</div>
+                    <div class="help-text">• Tap a project-node once from the architect view.</div>
+                    <div class="help-text">• Double-tap empty Blueprint space to create a task-node!</div>
+                    <div class="help-text">• Double-tap a task-node to edit details!</div>
                 </div>
 				                <div class="help-section" style="border-color: var(--accent-gold);">
                     <div class="help-title">📜 THE HISTORIAN</div>
@@ -760,8 +760,9 @@
                 <div class="help-section" style="border-color: var(--accent-purple);">
                     <div class="help-title">⚗️ THE INNOVATION LAB</div>
                     <div class="help-text">• When you work, work to prove your hypothesis!</div>
-                    <div class="help-text">• Double-tap empty space for a new experiment!</div>
-                    <div class="help-text">• Double-tap an experiment to edit!</div>
+					<div class="help-text">• Select a project-node by taping it!</div>
+                    <div class="help-text">• Double-tap empty innovation space for a new experiment!</div>
+                    <div class="help-text">• Double-tap an experiment  to edit!</div>
 					<div class="help-text">• Validate or Falsify a node to iterate! Science is fun!</div>
                 </div>
             </div>
@@ -782,10 +783,60 @@
                 <div class="form-group" id="group-lineage"><label class="form-label" id="lbl-lineage">LINEAGE</label>
                     <div id="container-lineage"></div>
                 </div>
-                <div class="form-group"><label class="form-label" id="lbl-catalyst">CATALYST</label>
+                <div class="form-group"><label class="form-label" id="lbl-catalyst">CATALYST<ol>
+
+				<li>What are the performance requirements?</li>
+
+				<li>What are the safety requirements? </li>
+
+				<li>What is the required environment?</li>
+
+				<li>What is the reliability requirements?</li>
+
+				<li>What is the regulatory requirements? </li>
+
+				<li>What is the cost requirements?</li>
+
+				<li>What is the  timeline requirements?</li>
+
+				<li>How can we verify each requirement?</li>
+
+				<li>How can we test each requirement?</li>
+
+				<li>How can we analyze each requirement?</li>
+
+				<li>how can we demonstrate weach requirement?</li>
+
+				</ol></label>
                     <textarea id="inp-catalyst" class="form-input" style="height:60px;"></textarea>
                 </div>
-                <div class="form-group"><label class="form-label" id="lbl-vector">VECTOR</label>
+                <div class="form-group"><label class="form-label" id="lbl-vector">VECTOR<OL>
+
+				<li>Who is the User Persona?</li>
+
+				<li>WHere is it used?</li>
+
+				<li>Under what condition does the user use it? </li>
+
+				<li>What does "success" look like" </li>
+
+				<li>How to verify Success? </li>
+
+				<li>How to test success?</li>
+
+				<li>How to analyze success?</li>
+
+				<li>How to demonstrate success? </li>
+
+				<li>What are normal Operating Scenarios?</li>
+
+				<li>What are Edge Operating Scenarios?</li>
+
+				<li>What are Failure Operating Scenarios?</li>
+
+				<li>What are Revisionism Operating Scenarios?</li>
+
+				</OL></label>
                     <textarea id="inp-vector" class="form-input" style="height:60px;"></textarea>
                 </div>
             </div>
